@@ -15,6 +15,7 @@ packages = []
 [project.optional-dependencies]
 dev = [
     "homeassistant==2026.9.1",
+    "home-assistant-frontend==20260826.7",
     "mypy==2.3.1",
     "pytest-homeassistant-custom-component==0.13.364",
     "ruff==0.16.6",

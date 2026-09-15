@@ -90,6 +90,7 @@ from .const import (
     SERVICE_START_FIRING,
     SERVICE_STOP_FIRING,
 )
+from .controller import OperatingState
 from .firing_schedule import (
     FiringSchedule,
     FiringScheduleInput,
@@ -344,7 +345,9 @@ class ChargingAdvisor:
             self._option(CONF_INITIAL_CHARGING_POWER, DEFAULT_INITIAL_CHARGING_POWER),
         )
         manual_use = self.coordinator.controller.mode.value == "use_tank"
-        forced_use = self.coordinator.controller.decision.state.value == "FORCED_USE"
+        forced_use = (
+            self.coordinator.controller.decision.state is OperatingState.FORCED_USE
+        )
         residual = self.coordinator.calibration.value(
             "residual_burn_energy_kwh",
             self._option(CONF_RESIDUAL_BURN_ENERGY, DEFAULT_RESIDUAL_BURN_ENERGY),

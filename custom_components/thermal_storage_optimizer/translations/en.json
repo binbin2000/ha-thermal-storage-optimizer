@@ -251,13 +251,13 @@
       "operating_state": {
         "name": "Operating state",
         "state": {
-          "USE_TANK": "Use tank",
-          "RESERVE_TANK": "Reserve tank",
-          "FORCED_USE": "Forced use",
-          "COLD_OR_EMPTY": "Cold or empty",
-          "WAITING_FOR_DATA": "Waiting for data",
-          "FAULT_FALLBACK": "Fault fallback",
-          "DISABLED": "Disabled"
+          "use_tank": "Use tank",
+          "reserve_tank": "Reserve tank",
+          "forced_use": "Forced use",
+          "cold_or_empty": "Cold or empty",
+          "waiting_for_data": "Waiting for data",
+          "fault_fallback": "Fault fallback",
+          "disabled": "Disabled"
         }
       },
       "controller_reason": {

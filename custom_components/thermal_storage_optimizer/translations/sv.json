@@ -251,13 +251,13 @@
       "operating_state": {
         "name": "Driftläge",
         "state": {
-          "USE_TANK": "Använd tank",
-          "RESERVE_TANK": "Reservera tank",
-          "FORCED_USE": "Tvingad användning",
-          "COLD_OR_EMPTY": "Kall eller tom",
-          "WAITING_FOR_DATA": "Väntar på data",
-          "FAULT_FALLBACK": "Felsäkert reservläge",
-          "DISABLED": "Avstängd"
+          "use_tank": "Använd tank",
+          "reserve_tank": "Reservera tank",
+          "forced_use": "Tvingad användning",
+          "cold_or_empty": "Kall eller tom",
+          "waiting_for_data": "Väntar på data",
+          "fault_fallback": "Felsäkert reservläge",
+          "disabled": "Avstängd"
         }
       },
       "controller_reason": {

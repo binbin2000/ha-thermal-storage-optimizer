@@ -62,13 +62,13 @@ class UserMode(StrEnum):
 class OperatingState(StrEnum):
     """Final operating states from the system specification."""
 
-    USE_TANK = "USE_TANK"
-    RESERVE_TANK = "RESERVE_TANK"
-    FORCED_USE = "FORCED_USE"
-    COLD_OR_EMPTY = "COLD_OR_EMPTY"
-    WAITING_FOR_DATA = "WAITING_FOR_DATA"
-    FAULT_FALLBACK = "FAULT_FALLBACK"
-    DISABLED = "DISABLED"
+    USE_TANK = "use_tank"
+    RESERVE_TANK = "reserve_tank"
+    FORCED_USE = "forced_use"
+    COLD_OR_EMPTY = "cold_or_empty"
+    WAITING_FOR_DATA = "waiting_for_data"
+    FAULT_FALLBACK = "fault_fallback"
+    DISABLED = "disabled"
 
 
 @dataclass(frozen=True, slots=True)

@@ -104,7 +104,7 @@ from .const import (
     DEFAULT_USABLE_CAPACITY,
     DOMAIN,
 )
-from .controller import SupervisoryController
+from .controller import OperatingState, SupervisoryController
 from .cop import CopEstimate, CopSource, FixedCopModel, estimate_cop
 from .data import PlanStatus, RuntimeSnapshot
 from .demand import HeatDemandConfig, estimate_heat_demand_kwh
@@ -637,7 +637,9 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             economic_deadband_per_kwh=self._economic_deadband,
             reserve_until=self._reserve_until if available_energy_kwh > 0 else None,
             minimum_dwell_seconds=self.controller.config.minimum_dwell.total_seconds(),
-            current_release_active=self.controller.decision.state.value == "USE_TANK",
+            current_release_active=(
+                self.controller.decision.state is OperatingState.USE_TANK
+            ),
         )
         self._plan_loaded_from_storage = False
         self._reserve_until = self._plan.reserve_until
