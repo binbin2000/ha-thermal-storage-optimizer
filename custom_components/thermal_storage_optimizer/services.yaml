@@ -1,0 +1,44 @@
+start_firing:
+  name: Start firing session
+  description: Manually mark the stove firing session as active.
+stop_firing:
+  name: Stop firing session tracking
+  description: Clear the manual active-session marker; this never controls the stove.
+acknowledge_recommendation:
+  name: Acknowledge recommendation
+  description: Mark the current planning cycle's recommendation as seen.
+snooze_recommendation:
+  name: Snooze recommendation
+  description: Suppress charging-advisor notifications for a bounded period.
+  fields:
+    minutes:
+      name: Minutes
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 1440
+          unit_of_measurement: min
+dismiss_recommendation:
+  name: Dismiss recommendation
+  description: Suppress the current planning cycle's recommendation.
+recalculate:
+  name: Recalculate current plan
+  description: Refresh available price data and rebuild the plan from current inputs. This does not bypass controller safety precedence.
+get_plan_summary:
+  name: Get bounded plan summary
+  description: Return a recorder-independent summary of the current plan with a bounded number of future intervals.
+  fields:
+    max_intervals:
+      name: Maximum intervals
+      description: Maximum number of future plan intervals to include in the response.
+      required: false
+      default: 12
+      selector:
+        number:
+          min: 1
+          max: 48
+          mode: box
+reset_learned_state:
+  name: Reset learned state
+  description: Reset bounded adaptive calibration only. Deterministic settings, safety state, controller mode, saved plan, and firing continuity are retained.

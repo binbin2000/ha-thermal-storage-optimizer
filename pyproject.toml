@@ -1,0 +1,51 @@
+[project]
+name = "thermal-storage-optimizer"
+version = "1.0.0"
+description = "Home Assistant custom integration for thermal storage planning"
+readme = "README.md"
+requires-python = ">=3.14.2"
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = []
+
+[project.optional-dependencies]
+dev = [
+    "homeassistant==2026.9.1",
+    "mypy==2.3.1",
+    "pytest-homeassistant-custom-component==0.13.364",
+    "ruff==0.16.6",
+]
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers --strict-config --basetemp=.pytest_tmp"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+extend-exclude = [".python", ".tools", "dev/home-assistant"]
+line-length = 88
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "CPY001", # Copyright headers are not used in this repository.
+    "COM812", # Conflicts with the formatter.
+    "D203",   # Conflicts with D211.
+    "D213",   # Conflicts with D212.
+    "ISC001", # Conflicts with the formatter.
+    "TC002",  # Runtime imports keep Home Assistant signatures readable.
+    "TC003",  # Runtime imports keep test signatures readable.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["PLR2004", "S101", "S106"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+files = ["custom_components/thermal_storage_optimizer"]

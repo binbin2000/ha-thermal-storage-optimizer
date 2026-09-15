@@ -1,0 +1,104 @@
+# Standard Home Assistant cards only. Entity IDs are the normal new-installation
+# defaults; replace them with the IDs shown on the integration device page.
+title: Thermal storage
+views:
+  - title: Commissioning
+    path: thermal-storage
+    icon: mdi:water-boiler
+    cards:
+      - type: markdown
+        content: >-
+          ## Thermal Storage Optimizer
+          This is an economic supervisor, not a safety controller. Keep physical
+          stove, pressure, circulation, overtemperature, flow, and freeze protection
+          active and independently tested.
+
+      - type: custom:thermal-storage-plan-card
+        title: Hourly tank plan
+        max_intervals: 48
+        last_optimization_entity: sensor.thermal_storage_optimizer_last_optimization
+        plan_status_entity: sensor.thermal_storage_optimizer_plan_status
+
+      - type: entities
+        title: Decision and control boundary
+        show_header_toggle: false
+        entities:
+          - entity: select.thermal_storage_optimizer_mode
+          - entity: sensor.thermal_storage_optimizer_operating_state
+          - entity: sensor.thermal_storage_optimizer_controller_decision_reason
+          - entity: sensor.thermal_storage_optimizer_decision_reason
+          - entity: binary_sensor.thermal_storage_optimizer_reserve_output_active
+          - entity: binary_sensor.thermal_storage_optimizer_data_valid
+          - entity: sensor.thermal_storage_optimizer_plan_status
+
+      - type: gauge
+        entity: sensor.thermal_storage_optimizer_state_of_charge
+        name: Estimated tank charge
+        min: 0
+        max: 100
+        severity:
+          green: 35
+          yellow: 15
+          red: 0
+
+      - type: entities
+        title: Tank and forecast
+        show_header_toggle: false
+        entities:
+          - entity: sensor.thermal_storage_optimizer_usable_energy
+          - entity: sensor.thermal_storage_optimizer_high_grade_energy
+          - entity: sensor.thermal_storage_optimizer_tank_stratification
+          - entity: sensor.thermal_storage_optimizer_forecast_coverage
+          - entity: sensor.thermal_storage_optimizer_next_tank_release
+          - entity: sensor.thermal_storage_optimizer_expected_avoided_cost
+
+      - type: entities
+        title: Stove charging advisor
+        show_header_toggle: false
+        entities:
+          - entity: binary_sensor.thermal_storage_charge_recommended
+          - entity: sensor.thermal_storage_charge_advice
+          - entity: sensor.thermal_storage_recommended_charge_duration
+          - entity: sensor.thermal_storage_recommended_start_earliest
+          - entity: sensor.thermal_storage_recommended_start_latest
+          - entity: sensor.thermal_storage_charge_complete_by
+          - entity: sensor.thermal_storage_charge_target_energy
+          - entity: sensor.thermal_storage_charge_remaining_energy
+          - entity: sensor.thermal_storage_charge_remaining_time
+          - entity: sensor.thermal_storage_charge_power
+          - entity: binary_sensor.thermal_storage_stove_firing
+
+      - type: horizontal-stack
+        cards:
+          - type: button
+            name: Recalculate
+            icon: mdi:calculator-variant
+            tap_action:
+              action: call-service
+              service: thermal_storage_optimizer.recalculate
+              confirmation:
+                text: Recalculate from current inputs?
+          - type: button
+            name: Start firing tracking
+            icon: mdi:fire
+            tap_action:
+              action: call-service
+              service: thermal_storage_optimizer.start_firing
+              confirmation:
+                text: Mark the supervised firing session active?
+          - type: button
+            name: Stop firing tracking
+            icon: mdi:fire-off
+            tap_action:
+              action: call-service
+              service: thermal_storage_optimizer.stop_firing
+
+      - type: history-graph
+        title: 48-hour validation history
+        hours_to_show: 48
+        entities:
+          - entity: sensor.thermal_storage_optimizer_usable_energy
+          - entity: sensor.thermal_storage_optimizer_high_grade_energy
+          - entity: sensor.thermal_storage_optimizer_state_of_charge
+          - entity: binary_sensor.thermal_storage_optimizer_tank_release_recommended
+          - entity: binary_sensor.thermal_storage_optimizer_reserve_output_active

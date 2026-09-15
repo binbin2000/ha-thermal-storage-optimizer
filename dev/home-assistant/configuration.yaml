@@ -1,0 +1,164 @@
+homeassistant:
+  name: Thermal Storage Optimizer Test
+  unit_system: metric
+  time_zone: Europe/Stockholm
+
+# Keep the native-Windows test instance deliberately small. `default_config`
+# includes voice and hardware integrations whose native extensions target the
+# supported HA operating systems rather than this local development harness.
+frontend:
+config:
+history:
+
+http:
+  server_port: 8123
+
+logger:
+  default: warning
+  logs:
+    custom_components.thermal_storage_optimizer: debug
+    # Media support is outside this harness; native Windows has no FFmpeg.
+    haffmpeg.core: critical
+    haffmpeg.tools: critical
+    homeassistant.components.camera.img_util: critical
+
+# Editable helpers provide live test controls in Settings > Devices & services
+# > Helpers. The template sensors below give the integration correctly typed
+# temperature, power, energy, and flow entities to select.
+input_number:
+  tso_tank_top:
+    name: TSO tank top control
+    min: 0
+    max: 100
+    step: 0.5
+    initial: 65
+    unit_of_measurement: "°C"
+  tso_tank_middle:
+    name: TSO tank middle control
+    min: 0
+    max: 100
+    step: 0.5
+    initial: 52
+    unit_of_measurement: "°C"
+  tso_tank_bottom:
+    name: TSO tank bottom control
+    min: 0
+    max: 100
+    step: 0.5
+    initial: 38
+    unit_of_measurement: "°C"
+  tso_return_temperature:
+    name: TSO return temperature control
+    min: 0
+    max: 80
+    step: 0.5
+    initial: 31
+    unit_of_measurement: "°C"
+  tso_supply_target:
+    name: TSO supply target control
+    min: 0
+    max: 80
+    step: 0.5
+    initial: 45
+    unit_of_measurement: "°C"
+  tso_outdoor_temperature:
+    name: TSO outdoor temperature control
+    min: -40
+    max: 40
+    step: 0.5
+    initial: 5
+    unit_of_measurement: "°C"
+  tso_heat_pump_power:
+    name: TSO heat pump power control
+    min: 0
+    max: 20
+    step: 0.1
+    initial: 2.5
+    unit_of_measurement: kW
+  tso_measured_cop:
+    name: TSO measured COP control
+    min: 0.1
+    max: 10
+    step: 0.1
+    initial: 3.2
+  tso_flow_rate:
+    name: TSO flow rate control
+    min: 0
+    max: 100
+    step: 0.5
+    initial: 18
+    unit_of_measurement: L/min
+
+input_boolean:
+  tso_reserve_output:
+    name: TSO reserve output
+  tso_stove_charging_pump:
+    name: TSO stove charging pump
+
+template:
+  - sensor:
+      - name: TSO tank top
+        unique_id: tso_test_tank_top
+        state: "{{ states('input_number.tso_tank_top') }}"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+      - name: TSO tank middle
+        unique_id: tso_test_tank_middle
+        state: "{{ states('input_number.tso_tank_middle') }}"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+      - name: TSO tank bottom
+        unique_id: tso_test_tank_bottom
+        state: "{{ states('input_number.tso_tank_bottom') }}"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+      - name: TSO return temperature
+        unique_id: tso_test_return_temperature
+        state: "{{ states('input_number.tso_return_temperature') }}"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+      - name: TSO supply target
+        unique_id: tso_test_supply_target
+        state: "{{ states('input_number.tso_supply_target') }}"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+      - name: TSO outdoor temperature
+        unique_id: tso_test_outdoor_temperature
+        state: "{{ states('input_number.tso_outdoor_temperature') }}"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+      - name: TSO price forecast
+        unique_id: tso_test_price_forecast
+        state: published
+        unit_of_measurement: "SEK/kWh"
+        attributes:
+          publication_id: "{{ now().date().isoformat() }}"
+          prices: >-
+            {{ [
+              {'start': now().replace(minute=0, second=0, microsecond=0).isoformat(), 'end': (now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)).isoformat(), 'price': 0.62},
+              {'start': (now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)).isoformat(), 'end': (now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1, minutes=30)).isoformat(), 'price': 0.48},
+              {'start': (now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1, minutes=30)).isoformat(), 'end': (now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=3)).isoformat(), 'price': 1.34},
+              {'start': (now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=3)).isoformat(), 'end': (now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=8)).isoformat(), 'price': 0.55}
+            ] }}
+      - name: TSO heat pump electrical power
+        unique_id: tso_test_heat_pump_power
+        state: "{{ states('input_number.tso_heat_pump_power') }}"
+        unit_of_measurement: kW
+        device_class: power
+        state_class: measurement
+      - name: TSO measured COP
+        unique_id: tso_test_measured_cop
+        state: "{{ states('input_number.tso_measured_cop') }}"
+        state_class: measurement
+      - name: TSO flow rate
+        unique_id: tso_test_flow_rate
+        state: "{{ states('input_number.tso_flow_rate') }}"
+        unit_of_measurement: L/min
+        device_class: volume_flow_rate
+        state_class: measurement

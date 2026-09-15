@@ -1,0 +1,375 @@
+{
+  "title": "Optimering av värmelager",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Konfigurera optimering av värmelager",
+        "description": "Välj indataentiteter och digital reservutgång. Fysisk styrning förblir avstängd tills den uttryckligen aktiveras under Alternativ.",
+        "data": {
+          "tank_top_entity": "Temperatur i tankens topp",
+          "tank_middle_entity": "Temperatur i tankens mitt",
+          "tank_bottom_entity": "Temperatur i tankens botten",
+          "return_temperature_entity": "Returtemperatur",
+          "supply_target_entity": "Börvärde för framledning",
+          "outdoor_temperature_entity": "Utomhustemperatur",
+          "price_forecast_entity": "Prisprognos eller Nord Pools sensor för aktuellt pris",
+          "reserve_output_entity": "Digital reservutgång",
+          "actual_supply_temperature_entity": "Faktisk framledningstemperatur (valfri)",
+          "indoor_temperature_entity": "Inomhustemperatur (valfri)",
+          "weather_entity": "Väderprognos (valfri)",
+          "heat_pump_electrical_power_entity": "Värmepumpens eleffekt (valfri)",
+          "heat_pump_electrical_energy_entity": "Värmepumpens elenergi (valfri)",
+          "heat_pump_produced_heat_entity": "Värmepumpens producerade värmeenergi (valfri)",
+          "measured_cop_entity": "Uppmätt COP (valfri)",
+          "stove_charging_pump_entity": "Kaminens laddpump (valfri)",
+          "stove_flow_temperature_entity": "Kaminens framledningstemperatur (valfri)",
+          "flow_rate_entity": "Tank-/radiatorflöde (valfritt)",
+          "notification_target_entity": "Aviseringsmål (valfritt)"
+        }
+      },
+      "reconfigure": {
+        "title": "Konfigurera om optimering av värmelager",
+        "description": "Ändra referenser till källentiteter och reservutgång. Indatalagret läses om.",
+        "data": {
+          "tank_top_entity": "Temperatur i tankens topp",
+          "tank_middle_entity": "Temperatur i tankens mitt",
+          "tank_bottom_entity": "Temperatur i tankens botten",
+          "return_temperature_entity": "Returtemperatur",
+          "supply_target_entity": "Börvärde för framledning",
+          "outdoor_temperature_entity": "Utomhustemperatur",
+          "price_forecast_entity": "Prisprognos eller Nord Pools sensor för aktuellt pris",
+          "reserve_output_entity": "Digital reservutgång",
+          "actual_supply_temperature_entity": "Faktisk framledningstemperatur (valfri)",
+          "indoor_temperature_entity": "Inomhustemperatur (valfri)",
+          "weather_entity": "Väderprognos (valfri)",
+          "heat_pump_electrical_power_entity": "Värmepumpens eleffekt (valfri)",
+          "heat_pump_electrical_energy_entity": "Värmepumpens elenergi (valfri)",
+          "heat_pump_produced_heat_entity": "Värmepumpens producerade värmeenergi (valfri)",
+          "measured_cop_entity": "Uppmätt COP (valfri)",
+          "stove_charging_pump_entity": "Kaminens laddpump (valfri)",
+          "stove_flow_temperature_entity": "Kaminens framledningstemperatur (valfri)",
+          "flow_rate_entity": "Tank-/radiatorflöde (valfritt)",
+          "notification_target_entity": "Aviseringsmål (valfritt)"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Endast en instans av Optimering av värmelager är tillåten.",
+      "already_configured": "Optimering av värmelager är redan konfigurerad.",
+      "reconfigure_successful": "Optimering av värmelager konfigurerades om."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Alternativ för optimering av värmelager",
+        "description": "Ställ in modeller och överordnade säkerhetsinställningar. Aktiv styrning är ett separat uttryckligt tillstånd och är avstängd som standard.",
+        "data": {
+          "adaptive_calibration_enabled": "Aktivera begränsad adaptiv kalibrering",
+          "calibration_min_confidence": "Minsta kalibreringskonfidens",
+          "capacity_calibration_min_kwh": "Minsta inlärda användbara kapacitet",
+          "capacity_calibration_max_kwh": "Största inlärda användbara kapacitet",
+          "heat_loss_calibration_min_kw_per_k": "Minsta inlärda värmeförlustkoefficient",
+          "heat_loss_calibration_max_kw_per_k": "Största inlärda värmeförlustkoefficient",
+          "balance_calibration_min_c": "Minsta inlärda balanstemperatur",
+          "balance_calibration_max_c": "Största inlärda balanstemperatur",
+          "cop_calibration_min": "Minsta inlärda COP",
+          "cop_calibration_max": "Största inlärda COP",
+          "charging_power_calibration_min_kw": "Minsta inlärda laddningseffekt",
+          "charging_power_calibration_max_kw": "Största inlärda laddningseffekt",
+          "residual_calibration_min_kwh": "Minsta inlärda efterbränningsenergi",
+          "residual_calibration_max_kwh": "Största inlärda efterbränningsenergi",
+          "sensor_stale_after": "Mätvärde inaktuellt efter",
+          "forecast_stale_after": "Prisprognos inaktuell efter",
+          "total_tank_volume_l": "Total tankvolym",
+          "top_layer_volume_l": "Effektiv volym för övre lagret",
+          "middle_layer_volume_l": "Effektiv volym för mittlagret",
+          "bottom_layer_volume_l": "Effektiv volym för undre lagret",
+          "minimum_useful_delta_c": "Minsta användbara temperaturdifferens",
+          "usable_capacity_kwh": "Kalibrerad användbar kapacitet",
+          "trend_deadband_kwh": "Dödband för energitrend",
+          "heat_loss_coefficient_kw_per_k": "Byggnadens värmeförlustkoefficient",
+          "balance_temperature_c": "Byggnadens balanstemperatur",
+          "fixed_cop": "Fast COP-reservvärde",
+          "price_multiplier": "Prismultiplikator",
+          "additive_variable_cost_per_kwh": "Rörligt kostnadstillägg",
+          "hourly_retention": "Lagringsretention per timme",
+          "forecast_confidence": "Prognoskonfidens",
+          "economic_deadband_per_kwh": "Ekonomiskt dödband",
+          "active_control": "Tillåt fysisk utgångsstyrning",
+          "output_inverted": "Invertera utgångens använd/reservera-logik",
+          "high_temperature_threshold_c": "Högtemperaturgräns för tvingad användning",
+          "high_temperature_hysteresis_c": "Hysteres för tvingad användning",
+          "startup_grace_period_s": "Startfördröjning",
+          "minimum_dwell_time_s": "Minsta hålltid för utgång",
+          "preferred_firing_windows": "Föredragna eldningstider per veckodag",
+          "minimum_firing_duration_min": "Minsta meningsfulla eldningstid",
+          "maximum_firing_duration_min": "Längsta eldningstid",
+          "notification_lead_time_min": "Förvarningstid",
+          "quiet_hours_start": "Tyst tid börjar",
+          "quiet_hours_end": "Tyst tid slutar",
+          "allow_exceptional_out_of_window": "Tillåt exceptionella råd utanför tidsfönster",
+          "initial_net_charging_power_kw": "Initial effektiv nettoladdeffekt",
+          "stove_temperature_threshold_c": "Temperaturgräns för aktiv kamin",
+          "charging_slope_threshold_kw": "Gräns för detekterad laddning",
+          "maximum_top_temperature_c": "Maximal måltemperatur i toppskikt",
+          "maximum_middle_temperature_c": "Maximal måltemperatur i mittskikt",
+          "maximum_bottom_temperature_c": "Maximal måltemperatur i bottenskikt",
+          "forced_use_margin_c": "Marginal till tvångsanvändning",
+          "residual_burn_energy_kwh": "Energitillägg från efterbränning",
+          "minimum_avoided_electricity_cost": "Minsta beräknade undvikbara elkostnad",
+          "notification_update_interval_min": "Intervall för statusavisering",
+          "notification_material_change_kwh": "Gräns för väsentlig måländring",
+          "notification_snooze_duration_min": "Standardtid för snooze",
+          "advisor_language": "Språk för råd",
+          "wood_cost_per_kg": "Vedkostnad (valfri)",
+          "wood_energy_content_kwh_per_kg": "Vedens energiinnehåll (valfritt)",
+          "stove_to_tank_efficiency": "Verkningsgrad kamin till tank (valfri)",
+          "replan_interval_minutes": "Planning interval (minutes)"
+        },
+        "data_description": {
+          "sensor_stale_after": "Högsta ålder för temperaturer och valfria mätvärden.",
+          "forecast_stale_after": "Högsta ålder för en publicerad prisprognos innan den avvisas.",
+          "total_tank_volume_l": "Fysisk tankvolym; måste motsvara summan av de tre effektiva lagervolymena.",
+          "top_layer_volume_l": "Vattenvolymen som representeras av den övre givaren.",
+          "middle_layer_volume_l": "Vattenvolymen som representeras av mittgivaren.",
+          "bottom_layer_volume_l": "Vattenvolymen som representeras av den undre givaren.",
+          "minimum_useful_delta_c": "Addera till returtemperaturen för användbar energireferens.",
+          "usable_capacity_kwh": "Energin som motsvarar 100 procent laddningsnivå.",
+          "trend_deadband_kwh": "Förändringar upp till detta värde klassas som stilla.",
+          "heat_loss_coefficient_kw_per_k": "Byggnadens värmebehov per kelvin under balanstemperaturen.",
+          "balance_temperature_c": "Utomhustemperatur där modellerat värmebehov blir noll.",
+          "fixed_cop": "Positivt deterministiskt reservvärde när giltig uppmätt COP saknas.",
+          "price_multiplier": "Multiplicerar det normaliserade deklarerade priset före tillägg.",
+          "additive_variable_cost_per_kwh": "Rörlig skatt, nät- eller leverantörskostnad i samma valuta per kWh.",
+          "hourly_retention": "Andel av lagrad energis värde som återstår för varje framtida timme.",
+          "forecast_confidence": "Försiktig rabatt som tillämpas på prognosvärdet.",
+          "economic_deadband_per_kwh": "Minsta värdeskillnad innan tankenergi tilldelas.",
+          "active_control": "Uttryckligt godkännande av serviceanrop. Lämna avstängt för torrkörning; Auto ger inte ensam styrbehörighet.",
+          "output_inverted": "Av betyder tankanvändning och på betyder reserv när detta är avstängt. Felreserv är alltid fysiskt av.",
+          "high_temperature_threshold_c": "Ett giltigt tanklager vid eller över värdet tvingar omedelbart tankanvändning.",
+          "high_temperature_hysteresis_c": "Tvingad användning kvarstår tills alla giltiga tanklager har svalnat så mycket under gränsen.",
+          "startup_grace_period_s": "Reservutgången kan inte aktiveras under denna tid efter laddning eller omstart.",
+          "minimum_dwell_time_s": "Motverkar pendling. Tvingad högtemperaturanvändning och felsäkert av sker omedelbart.",
+          "replan_interval_minutes": "Planning interval (minutes)"
+        }
+      }
+    },
+    "error": {
+      "invalid_layer_volumes": "De tre lagervolymerna måste tillsammans motsvara den totala tankvolymen.",
+      "invalid_high_temperature_hysteresis": "Högtemperaturhysteresen måste vara lägre än gränsen för tvingad användning.",
+      "invalid_firing_options": "Kontrollera föredragna eldningstider och minsta/längsta varaktighet.",
+      "invalid_calibration_bounds": "Varje kalibreringsminimum måste vara mindre än eller lika med maximum."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "ready": "Klar",
+          "waiting_for_data": "Väntar på data",
+          "invalid_data": "Ogiltiga data"
+        }
+      },
+      "energy": {
+        "name": "Användbar energi"
+      },
+      "high_grade_energy": {
+        "name": "Högvärdig energi"
+      },
+      "soc": {
+        "name": "Laddningsnivå"
+      },
+      "reference_temperature": {
+        "name": "Referenstemperatur för användbar energi"
+      },
+      "stratification": {
+        "name": "Tankskiktning"
+      },
+      "confidence": {
+        "name": "Konfidens för energiberäkning"
+      },
+      "data_quality": {
+        "name": "Datakvalitet för energi",
+        "state": {
+          "good": "Bra",
+          "degraded": "Försämrad",
+          "unavailable": "Ej tillgänglig"
+        }
+      },
+      "trend": {
+        "name": "Energitrend",
+        "state": {
+          "charging": "Laddar",
+          "discharging": "Urladdar",
+          "idle": "Stilla",
+          "unknown": "Okänd"
+        }
+      },
+      "hourly_heat_demand": {
+        "name": "Värmebehov nästa timme"
+      },
+      "estimated_cop": {
+        "name": "Beräknad COP"
+      },
+      "cop_source": {
+        "name": "COP-källa",
+        "state": {
+          "measured": "Uppmätt",
+          "calibrated": "Kalibrerad",
+          "fixed_fallback": "Fast reservvärde"
+        }
+      },
+      "forecast_end": {
+        "name": "Prognosslut"
+      },
+      "forecast_coverage": {
+        "name": "Prognostäckning"
+      },
+      "last_optimization": {
+        "name": "Senaste optimering"
+      },
+      "next_release": {
+        "name": "Nästa tankuttag"
+      },
+      "expected_savings": {
+        "name": "Förväntad undviken kostnad"
+      },
+      "decision_reason": {
+        "name": "Beslutsorsak"
+      },
+      "plan_status": {
+        "name": "Planstatus",
+        "state": {
+          "full_forecast": "Full prognos",
+          "saved_plan": "Sparad plan",
+          "waiting": "Väntar",
+          "invalid": "Ogiltig"
+        }
+      },
+      "operating_state": {
+        "name": "Driftläge",
+        "state": {
+          "USE_TANK": "Använd tank",
+          "RESERVE_TANK": "Reservera tank",
+          "FORCED_USE": "Tvingad användning",
+          "COLD_OR_EMPTY": "Kall eller tom",
+          "WAITING_FOR_DATA": "Väntar på data",
+          "FAULT_FALLBACK": "Felsäkert reservläge",
+          "DISABLED": "Avstängd"
+        }
+      },
+      "controller_reason": {
+        "name": "Styrenhetens beslutsorsak"
+      },
+      "recommended_charge_duration": {
+        "name": "Rekommenderad laddtid"
+      },
+      "recommended_start_earliest": {
+        "name": "Tidigaste meningsfulla start"
+      },
+      "recommended_start_latest": {
+        "name": "Senaste start"
+      },
+      "charge_complete_by": {
+        "name": "Laddning klar senast"
+      },
+      "charge_target_energy": {
+        "name": "Laddmål energi"
+      },
+      "charge_remaining_energy": {
+        "name": "Återstående laddenergi"
+      },
+      "charge_remaining_time": {
+        "name": "Återstående laddtid"
+      },
+      "charge_power": {
+        "name": "Nettoladdeffekt"
+      },
+      "charge_advice": {
+        "name": "Laddningsråd"
+      },
+      "estimated_avoided_electricity_cost": {
+        "name": "Beräknad undvikbar elkostnad"
+      },
+      "estimated_net_saving": {
+        "name": "Beräknad nettobesparing"
+      }
+    },
+    "binary_sensor": {
+      "data_valid": {
+        "name": "Giltiga data"
+      },
+      "release_recommended": {
+        "name": "Tankuttag rekommenderas"
+      },
+      "output_active": {
+        "name": "Reservutgång aktiv"
+      },
+      "charge_recommended": {
+        "name": "Manuell laddning rekommenderas"
+      },
+      "stove_firing": {
+        "name": "Kamineldning"
+      }
+    },
+    "select": {
+      "mode": {
+        "name": "Läge",
+        "state": {
+          "auto": "Auto",
+          "use_tank": "Använd tank",
+          "reserve_tank": "Reservera tank",
+          "disabled": "Avstängd"
+        }
+      }
+    }
+  },
+  "services": {
+    "start_firing": {
+      "name": "Starta eldningssession",
+      "description": "Markera manuell kamineldning som aktiv; detta styr aldrig kaminen."
+    },
+    "stop_firing": {
+      "name": "Stoppa eldningssession",
+      "description": "Rensa den manuella eldningsmarkeringen; detta styr aldrig kaminen."
+    },
+    "acknowledge_recommendation": {
+      "name": "Bekräfta rekommendation",
+      "description": "Markera det aktuella laddningsrådet som sett."
+    },
+    "snooze_recommendation": {
+      "name": "Pausa rekommendation",
+      "description": "Pausa rådgivarens aviseringar tillfälligt.",
+      "fields": {
+        "minutes": {
+          "name": "Minuter",
+          "description": "Längd på den tidsbegränsade pausen."
+        }
+      }
+    },
+    "dismiss_recommendation": {
+      "name": "Avfärda rekommendation",
+      "description": "Pausa rådgivarens aviseringar för aktuell planeringscykel."
+    },
+    "recalculate": {
+      "name": "Beräkna aktuell plan igen",
+      "description": "Uppdatera tillgängliga priser och bygg om planen utan att kringgå säkerhetsordningen."
+    },
+    "get_plan_summary": {
+      "name": "Hämta begränsad plansammanfattning",
+      "description": "Returnera en begränsad aktuell plansammanfattning utanför entitetsattribut.",
+      "fields": {
+        "max_intervals": {
+          "name": "Högsta antal intervall",
+          "description": "Högsta antal framtida intervall som returneras, 1 till 48."
+        }
+      }
+    },
+    "reset_learned_state": {
+      "name": "Återställ inlärt tillstånd",
+      "description": "Återställ begränsad adaptiv kalibrering men behåll deterministiska inställningar, planer, lägen och säkerhetstillstånd."
+    }
+  }
+}

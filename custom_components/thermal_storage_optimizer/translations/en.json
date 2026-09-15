@@ -1,0 +1,375 @@
+{
+  "title": "Thermal Storage Optimizer",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Thermal Storage Optimizer",
+        "description": "Select the input entities and digital reserve output. Physical control remains disabled until explicitly enabled under Options.",
+        "data": {
+          "tank_top_entity": "Tank top temperature",
+          "tank_middle_entity": "Tank middle temperature",
+          "tank_bottom_entity": "Tank bottom temperature",
+          "return_temperature_entity": "Return temperature",
+          "supply_target_entity": "Supply target temperature",
+          "outdoor_temperature_entity": "Outdoor temperature",
+          "price_forecast_entity": "Price forecast or Nord Pool current-price sensor",
+          "reserve_output_entity": "Digital reserve output",
+          "actual_supply_temperature_entity": "Actual supply temperature (optional)",
+          "indoor_temperature_entity": "Indoor temperature (optional)",
+          "weather_entity": "Weather forecast (optional)",
+          "heat_pump_electrical_power_entity": "Heat-pump electrical power (optional)",
+          "heat_pump_electrical_energy_entity": "Heat-pump electrical energy (optional)",
+          "heat_pump_produced_heat_entity": "Heat-pump produced heat energy (optional)",
+          "measured_cop_entity": "Measured COP (optional)",
+          "stove_charging_pump_entity": "Stove charging pump (optional)",
+          "stove_flow_temperature_entity": "Stove flow temperature (optional)",
+          "flow_rate_entity": "Tank/radiator flow rate (optional)",
+          "notification_target_entity": "Notification target (optional)"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Thermal Storage Optimizer",
+        "description": "Change source and reserve-output entity references. This reloads the input layer.",
+        "data": {
+          "tank_top_entity": "Tank top temperature",
+          "tank_middle_entity": "Tank middle temperature",
+          "tank_bottom_entity": "Tank bottom temperature",
+          "return_temperature_entity": "Return temperature",
+          "supply_target_entity": "Supply target temperature",
+          "outdoor_temperature_entity": "Outdoor temperature",
+          "price_forecast_entity": "Price forecast or Nord Pool current-price sensor",
+          "reserve_output_entity": "Digital reserve output",
+          "actual_supply_temperature_entity": "Actual supply temperature (optional)",
+          "indoor_temperature_entity": "Indoor temperature (optional)",
+          "weather_entity": "Weather forecast (optional)",
+          "heat_pump_electrical_power_entity": "Heat-pump electrical power (optional)",
+          "heat_pump_electrical_energy_entity": "Heat-pump electrical energy (optional)",
+          "heat_pump_produced_heat_entity": "Heat-pump produced heat energy (optional)",
+          "measured_cop_entity": "Measured COP (optional)",
+          "stove_charging_pump_entity": "Stove charging pump (optional)",
+          "stove_flow_temperature_entity": "Stove flow temperature (optional)",
+          "flow_rate_entity": "Tank/radiator flow rate (optional)",
+          "notification_target_entity": "Notification target (optional)"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one Thermal Storage Optimizer instance is allowed.",
+      "already_configured": "Thermal Storage Optimizer is already configured.",
+      "reconfigure_successful": "Thermal Storage Optimizer was reconfigured successfully."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Thermal Storage Optimizer options",
+        "description": "Configure models and supervisory safety settings. Active control is a separate explicit permission and defaults to off.",
+        "data": {
+          "adaptive_calibration_enabled": "Enable bounded adaptive calibration",
+          "calibration_min_confidence": "Minimum calibration confidence",
+          "capacity_calibration_min_kwh": "Minimum learned usable capacity",
+          "capacity_calibration_max_kwh": "Maximum learned usable capacity",
+          "heat_loss_calibration_min_kw_per_k": "Minimum learned heat-loss coefficient",
+          "heat_loss_calibration_max_kw_per_k": "Maximum learned heat-loss coefficient",
+          "balance_calibration_min_c": "Minimum learned balance temperature",
+          "balance_calibration_max_c": "Maximum learned balance temperature",
+          "cop_calibration_min": "Minimum learned COP",
+          "cop_calibration_max": "Maximum learned COP",
+          "charging_power_calibration_min_kw": "Minimum learned charging power",
+          "charging_power_calibration_max_kw": "Maximum learned charging power",
+          "residual_calibration_min_kwh": "Minimum learned residual energy",
+          "residual_calibration_max_kwh": "Maximum learned residual energy",
+          "sensor_stale_after": "Measurement stale after",
+          "forecast_stale_after": "Price forecast stale after",
+          "total_tank_volume_l": "Total tank volume",
+          "top_layer_volume_l": "Top layer effective volume",
+          "middle_layer_volume_l": "Middle layer effective volume",
+          "bottom_layer_volume_l": "Bottom layer effective volume",
+          "minimum_useful_delta_c": "Minimum useful temperature delta",
+          "usable_capacity_kwh": "Calibrated usable capacity",
+          "trend_deadband_kwh": "Energy trend deadband",
+          "heat_loss_coefficient_kw_per_k": "Building heat-loss coefficient",
+          "balance_temperature_c": "Building balance temperature",
+          "fixed_cop": "Fixed COP fallback",
+          "price_multiplier": "Price multiplier",
+          "additive_variable_cost_per_kwh": "Additive variable cost",
+          "hourly_retention": "Hourly storage retention",
+          "forecast_confidence": "Forecast confidence",
+          "economic_deadband_per_kwh": "Economic deadband",
+          "active_control": "Allow physical output control",
+          "output_inverted": "Invert normal use/reserve output mapping",
+          "high_temperature_threshold_c": "Forced-use high-temperature threshold",
+          "high_temperature_hysteresis_c": "Forced-use hysteresis",
+          "startup_grace_period_s": "Startup grace period",
+          "minimum_dwell_time_s": "Minimum output dwell time",
+          "preferred_firing_windows": "Preferred firing windows by weekday",
+          "minimum_firing_duration_min": "Minimum worthwhile firing duration",
+          "maximum_firing_duration_min": "Maximum firing duration",
+          "notification_lead_time_min": "Notification lead time",
+          "quiet_hours_start": "Quiet hours start",
+          "quiet_hours_end": "Quiet hours end",
+          "allow_exceptional_out_of_window": "Allow exceptional out-of-window recommendations",
+          "initial_net_charging_power_kw": "Initial effective net charging power",
+          "stove_temperature_threshold_c": "Active stove temperature threshold",
+          "charging_slope_threshold_kw": "Charging slope detection threshold",
+          "maximum_top_temperature_c": "Maximum top-layer target temperature",
+          "maximum_middle_temperature_c": "Maximum middle-layer target temperature",
+          "maximum_bottom_temperature_c": "Maximum bottom-layer target temperature",
+          "forced_use_margin_c": "Forced-use threshold margin",
+          "residual_burn_energy_kwh": "Residual-burn energy allowance",
+          "minimum_avoided_electricity_cost": "Minimum estimated avoided electricity cost",
+          "notification_update_interval_min": "Progress notification interval",
+          "notification_material_change_kwh": "Material target-change threshold",
+          "notification_snooze_duration_min": "Default snooze duration",
+          "advisor_language": "Advice language",
+          "wood_cost_per_kg": "Wood cost (optional)",
+          "wood_energy_content_kwh_per_kg": "Wood energy content (optional)",
+          "stove_to_tank_efficiency": "Stove-to-tank efficiency (optional)",
+          "replan_interval_minutes": "Planning interval (minutes)"
+        },
+        "data_description": {
+          "sensor_stale_after": "Maximum age for temperature and optional measurement updates.",
+          "forecast_stale_after": "Maximum age for a published price forecast before it is rejected.",
+          "total_tank_volume_l": "Physical tank volume; must equal the three effective layer volumes.",
+          "top_layer_volume_l": "Water volume represented by the top sensor.",
+          "middle_layer_volume_l": "Water volume represented by the middle sensor.",
+          "bottom_layer_volume_l": "Water volume represented by the bottom sensor.",
+          "minimum_useful_delta_c": "Added to return temperature to form the usable-energy reference.",
+          "usable_capacity_kwh": "Energy corresponding to 100% state of charge.",
+          "trend_deadband_kwh": "Changes at or below this amount are classified as idle.",
+          "heat_loss_coefficient_kw_per_k": "Building heat demand per kelvin below balance temperature.",
+          "balance_temperature_c": "Outdoor temperature at or above which modeled heating demand is zero.",
+          "fixed_cop": "Positive deterministic fallback when no valid measured COP is available.",
+          "price_multiplier": "Multiplies the normalized declared price before additions.",
+          "additive_variable_cost_per_kwh": "Variable tax, grid, or supplier cost in the same currency per kWh.",
+          "hourly_retention": "Fraction of stored energy value retained for each hour into the future.",
+          "forecast_confidence": "Conservative discount applied to forecast value.",
+          "economic_deadband_per_kwh": "Minimum value advantage needed before tank energy is allocated.",
+          "active_control": "Explicit opt-in to service calls. Leave disabled for dry-run; Auto mode alone does not grant control.",
+          "output_inverted": "Off means tank use and on means reserve when disabled. Enable only for reversed logical mapping; fault fallback is always physical off.",
+          "high_temperature_threshold_c": "Any valid tank layer at or above this value immediately forces tank use.",
+          "high_temperature_hysteresis_c": "Forced use remains latched until all valid tank layers cool this far below the threshold.",
+          "startup_grace_period_s": "Reserve output cannot energize during this period after each load or restart.",
+          "minimum_dwell_time_s": "Prevents command chatter. Forced high-temperature use and fail-safe off are immediate.",
+          "replan_interval_minutes": "Planning interval (minutes)"
+        }
+      }
+    },
+    "error": {
+      "invalid_layer_volumes": "The three layer volumes must sum to the total tank volume.",
+      "invalid_high_temperature_hysteresis": "High-temperature hysteresis must be lower than the forced-use threshold.",
+      "invalid_firing_options": "Check the preferred firing windows and minimum/maximum durations.",
+      "invalid_calibration_bounds": "Each calibration minimum must be no greater than its maximum."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "ready": "Ready",
+          "waiting_for_data": "Waiting for data",
+          "invalid_data": "Invalid data"
+        }
+      },
+      "energy": {
+        "name": "Usable energy"
+      },
+      "high_grade_energy": {
+        "name": "High-grade energy"
+      },
+      "soc": {
+        "name": "State of charge"
+      },
+      "reference_temperature": {
+        "name": "Usable energy reference temperature"
+      },
+      "stratification": {
+        "name": "Tank stratification"
+      },
+      "confidence": {
+        "name": "Energy estimate confidence"
+      },
+      "data_quality": {
+        "name": "Energy data quality",
+        "state": {
+          "good": "Good",
+          "degraded": "Degraded",
+          "unavailable": "Unavailable"
+        }
+      },
+      "trend": {
+        "name": "Energy trend",
+        "state": {
+          "charging": "Charging",
+          "discharging": "Discharging",
+          "idle": "Idle",
+          "unknown": "Unknown"
+        }
+      },
+      "hourly_heat_demand": {
+        "name": "Heat demand next hour"
+      },
+      "estimated_cop": {
+        "name": "Estimated COP"
+      },
+      "cop_source": {
+        "name": "COP source",
+        "state": {
+          "measured": "Measured",
+          "calibrated": "Calibrated",
+          "fixed_fallback": "Fixed fallback"
+        }
+      },
+      "forecast_end": {
+        "name": "Forecast end"
+      },
+      "forecast_coverage": {
+        "name": "Forecast coverage"
+      },
+      "last_optimization": {
+        "name": "Last optimization"
+      },
+      "next_release": {
+        "name": "Next tank release"
+      },
+      "expected_savings": {
+        "name": "Expected avoided cost"
+      },
+      "decision_reason": {
+        "name": "Decision reason"
+      },
+      "plan_status": {
+        "name": "Plan status",
+        "state": {
+          "full_forecast": "Full forecast",
+          "saved_plan": "Saved plan",
+          "waiting": "Waiting",
+          "invalid": "Invalid"
+        }
+      },
+      "operating_state": {
+        "name": "Operating state",
+        "state": {
+          "USE_TANK": "Use tank",
+          "RESERVE_TANK": "Reserve tank",
+          "FORCED_USE": "Forced use",
+          "COLD_OR_EMPTY": "Cold or empty",
+          "WAITING_FOR_DATA": "Waiting for data",
+          "FAULT_FALLBACK": "Fault fallback",
+          "DISABLED": "Disabled"
+        }
+      },
+      "controller_reason": {
+        "name": "Controller decision reason"
+      },
+      "recommended_charge_duration": {
+        "name": "Recommended charge duration"
+      },
+      "recommended_start_earliest": {
+        "name": "Earliest useful start"
+      },
+      "recommended_start_latest": {
+        "name": "Latest start"
+      },
+      "charge_complete_by": {
+        "name": "Charge complete by"
+      },
+      "charge_target_energy": {
+        "name": "Charge target energy"
+      },
+      "charge_remaining_energy": {
+        "name": "Charge remaining energy"
+      },
+      "charge_remaining_time": {
+        "name": "Charge remaining time"
+      },
+      "charge_power": {
+        "name": "Net charging power"
+      },
+      "charge_advice": {
+        "name": "Charge advice"
+      },
+      "estimated_avoided_electricity_cost": {
+        "name": "Estimated avoided electricity cost"
+      },
+      "estimated_net_saving": {
+        "name": "Estimated net saving"
+      }
+    },
+    "binary_sensor": {
+      "data_valid": {
+        "name": "Data valid"
+      },
+      "release_recommended": {
+        "name": "Tank release recommended"
+      },
+      "output_active": {
+        "name": "Reserve output active"
+      },
+      "charge_recommended": {
+        "name": "Manual charge recommended"
+      },
+      "stove_firing": {
+        "name": "Stove firing"
+      }
+    },
+    "select": {
+      "mode": {
+        "name": "Mode",
+        "state": {
+          "auto": "Auto",
+          "use_tank": "Use tank",
+          "reserve_tank": "Reserve tank",
+          "disabled": "Disabled"
+        }
+      }
+    }
+  },
+  "services": {
+    "start_firing": {
+      "name": "Start firing session",
+      "description": "Mark manual stove firing as active; this never controls the stove."
+    },
+    "stop_firing": {
+      "name": "Stop firing session",
+      "description": "Clear the manual firing marker; this never controls the stove."
+    },
+    "acknowledge_recommendation": {
+      "name": "Acknowledge recommendation",
+      "description": "Mark the current charging recommendation as seen."
+    },
+    "snooze_recommendation": {
+      "name": "Snooze recommendation",
+      "description": "Suppress advisor notifications temporarily.",
+      "fields": {
+        "minutes": {
+          "name": "Minutes",
+          "description": "Length of the bounded snooze."
+        }
+      }
+    },
+    "dismiss_recommendation": {
+      "name": "Dismiss recommendation",
+      "description": "Suppress advisor notifications for the current planning cycle."
+    },
+    "recalculate": {
+      "name": "Recalculate current plan",
+      "description": "Refresh available prices and rebuild the plan without bypassing safety precedence."
+    },
+    "get_plan_summary": {
+      "name": "Get bounded plan summary",
+      "description": "Return a recorder-independent bounded current-plan response.",
+      "fields": {
+        "max_intervals": {
+          "name": "Maximum intervals",
+          "description": "Maximum future intervals returned, from 1 to 48."
+        }
+      }
+    },
+    "reset_learned_state": {
+      "name": "Reset learned state",
+      "description": "Reset bounded adaptive calibration while retaining deterministic settings, plans, modes, and safety state."
+    }
+  }
+}
