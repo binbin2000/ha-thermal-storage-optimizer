@@ -16,7 +16,7 @@ NOW = datetime(2026, 9, 6, 12, tzinfo=UTC)
 
 def raw(
     *,
-    state: str | None = "68",
+    state: str | float | None = "68",
     unit: str | None = "°F",
     updated_at: datetime | None = NOW,
     kind: InputKind = InputKind.TEMPERATURE,
@@ -60,6 +60,14 @@ def test_valid_fixture_produces_typed_normalized_snapshot() -> None:
     assert snapshot.values["power"].value == pytest.approx(2.5)
     with pytest.raises(TypeError):
         snapshot.values["new"] = snapshot.values["test"]  # type: ignore[index]
+
+
+def test_numeric_state_is_coerced_before_normalization() -> None:
+    """Test numeric state objects are accepted without string method failures."""
+    snapshot = normalize_inputs((raw(state=68.0),), NOW)
+
+    assert snapshot.is_valid
+    assert snapshot.values["test"].value == pytest.approx(20.0)
 
 
 @pytest.mark.parametrize(
