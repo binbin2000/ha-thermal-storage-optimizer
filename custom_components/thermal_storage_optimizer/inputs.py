@@ -44,7 +44,7 @@ class RawInput:
     entity_id: str
     kind: InputKind
     required: bool
-    state: str | None
+    state: str | float | None
     unit: str | None
     updated_at: datetime | None
     stale_after: timedelta | None
@@ -144,7 +144,7 @@ def _normalize_one(
         return _issue(raw, problem)
     if raw.state is None or raw.updated_at is None:
         return _issue(raw, InputProblem.INVALID_TIMESTAMP)
-    state = raw.state.strip()
+    state = str(raw.state).strip()
 
     if raw.kind is InputKind.AVAILABILITY:
         return NormalizedValue(raw.entity_id, state, None, raw.updated_at)
@@ -163,9 +163,9 @@ def _common_problem(raw: RawInput, captured_at: datetime) -> InputProblem | None
     problem: InputProblem | None = None
     if raw.state is None:
         problem = InputProblem.MISSING
-    elif raw.state.strip().lower() == "unknown":
+    elif str(raw.state).strip().lower() == "unknown":
         problem = InputProblem.UNKNOWN
-    elif raw.state.strip().lower() == "unavailable":
+    elif str(raw.state).strip().lower() == "unavailable":
         problem = InputProblem.UNAVAILABLE
     elif (
         raw.updated_at is None
