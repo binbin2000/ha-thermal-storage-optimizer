@@ -57,6 +57,7 @@ total tank volume.
 
 Read the complete [installation, upgrade, reload, restart, and removal guide](docs/installation.md)
 before changing an existing installation. Also review the [compatibility statement](docs/compatibility.md),
+[configuration reference](docs/configuration.md),
 [release notes](docs/release-notes-1.0.0.md), [changelog](CHANGELOG.md), and
 [backup/rollback procedure](docs/backup-rollback.md).
 
