@@ -125,6 +125,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _VALIDITY_REFRESH_INTERVAL = timedelta(minutes=1)
+_WEATHER_REFRESH_INTERVAL = timedelta(hours=1)
 _STORAGE_VERSION = 1
 _MAX_EXPLANATION_LENGTH: Final = 320
 
@@ -264,9 +265,15 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
         self.controller = SupervisoryController(hass, entry, self)
         self.advisor = ChargingAdvisor(hass, entry, self)
 
+    @property
+    def adapter(self) -> HomeAssistantInputAdapter:
+        """Expose the read-only input adapter for diagnostics."""
+        return self._adapter
+
     async def async_start(self) -> None:
         """Create the initial snapshot, then subscribe for recovery updates."""
         await self._adapter.async_prepare_price_forecast(self._price_config)
+        await self._adapter.async_prepare_outdoor_forecast()
         stored = await self._store.async_load()
         calibration = await self._calibration_store.async_load()
         self.calibration.restore(calibration, now=self._adapter.snapshot().captured_at)
@@ -302,11 +309,21 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                 cancel_on_shutdown=True,
             )
         )
+        if self._adapter.weather_entity_id is not None:
+            self._entry.async_on_unload(
+                async_track_time_interval(
+                    self.hass,
+                    self._async_scheduled_weather_refresh,
+                    _WEATHER_REFRESH_INTERVAL,
+                    cancel_on_shutdown=True,
+                )
+            )
 
     async def async_recalculate(self) -> None:
         """Refresh provider data and rebuild the plan from the current snapshot."""
         async with self._price_refresh_lock:
             await self._adapter.async_prepare_price_forecast(self._price_config)
+            await self._adapter.async_prepare_outdoor_forecast()
             self._force_recalculation = True
             try:
                 self._refresh_snapshot()
@@ -325,12 +342,34 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                 f"refresh {DOMAIN} Nord Pool forecast",
             )
             return
+        if event.data["entity_id"] == self._adapter.weather_entity_id:
+            self._schedule_weather_refresh()
+            return
         self._refresh_or_fallback()
 
     async def _async_refresh_official_price(self) -> None:
         """Serialize official Nord Pool response-action refreshes."""
         async with self._price_refresh_lock:
             await self._adapter.async_prepare_price_forecast(self._price_config)
+            self._refresh_or_fallback()
+
+    @callback
+    def _async_scheduled_weather_refresh(self, _now: datetime) -> None:
+        """Refresh the hourly forecast even when the weather state is unchanged."""
+        self._schedule_weather_refresh()
+
+    @callback
+    def _schedule_weather_refresh(self) -> None:
+        """Run the weather response action outside the state-change callback."""
+        self.hass.async_create_task(
+            self._async_refresh_outdoor_forecast(),
+            f"refresh {DOMAIN} weather forecast",
+        )
+
+    async def _async_refresh_outdoor_forecast(self) -> None:
+        """Serialize weather response-action refreshes with price refreshes."""
+        async with self._price_refresh_lock:
+            await self._adapter.async_prepare_outdoor_forecast()
             self._refresh_or_fallback()
 
     @callback
@@ -554,6 +593,7 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                 Recommendation.WAITING,
                 rejected,
             )
+        outdoor_forecast = self._adapter.outdoor_forecast
         planning_inputs = (
             available_energy_kwh,
             outdoor_temperature_c,
@@ -563,6 +603,7 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             cop_confidence,
             demand_config,
             cop_model,
+            outdoor_forecast,
         )
         if (
             not self._force_recalculation
@@ -612,6 +653,7 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             cop_model=cop_model,
             demand_config=demand_config,
             model_config=model_config,
+            outdoor_forecast=outdoor_forecast,
         )
         if not forecast:
             if self._plan is not None:

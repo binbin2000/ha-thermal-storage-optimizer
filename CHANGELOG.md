@@ -3,6 +3,16 @@
 All notable changes use [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Hourly outdoor-temperature forecasts from the selected weather entity now drive
+  per-interval heat demand. The forecast is bias-corrected toward the measured
+  outdoor temperature over the first six hours and falls back to the measured value
+  when unavailable, malformed, or stale. Diagnostics and the plan summary report
+  the forecast state and per-interval outdoor temperature.
+
 ## [1.0.0] - 2026-09-08
 
 ### Added

@@ -41,7 +41,7 @@ make the required input set invalid.
 | --- | --- | --- |
 | Actual supply temperature | Temperature sensor | Additional observed supply temperature. |
 | Indoor temperature | Temperature sensor | Additional indoor-condition measurement. |
-| Weather forecast | `weather` entity | Validates weather availability. The current release still repeats measured outdoor temperature in forecast demand calculations rather than applying hourly weather forecasts. |
+| Weather forecast | `weather` entity | Supplies the hourly outdoor-temperature forecast through the core `weather.get_forecasts` action. Each price interval uses the forecast at its midpoint, corrected by the difference between the measured outdoor temperature and the forecast for the current time (the correction fades out over six hours). The forecast is refreshed at load, when the weather entity updates, hourly, and on `recalculate`. A failed, malformed, or more than 12-hour-old forecast falls back to the measured outdoor temperature for every interval. |
 | Heat-pump electrical power | Power sensor | Instantaneous heat-pump electrical consumption for diagnostics and calibration evidence. |
 | Heat-pump electrical energy | Energy sensor | Cumulative electrical energy; pair with produced heat energy for adaptive COP calibration. |
 | Heat-pump produced heat energy | Energy sensor | Cumulative delivered heat used by adaptive calibration and validation. |

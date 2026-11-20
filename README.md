@@ -273,9 +273,11 @@ retry. A successful service call does not establish physical relay confirmation.
 
 Charging power is net tank storage gain. The target includes planned discharge
 before firing begins, including manual/forced use, without adding building demand
-again during firing. Forecast outdoor temperature currently repeats the measured
-outdoor temperature; selecting a weather entity validates availability but does
-not yet apply its hourly forecast. High-grade energy remains diagnostic.
+again during firing. When a weather entity is selected, each forecast interval
+uses the hourly outdoor forecast at its midpoint, corrected toward the measured
+outdoor temperature for the first six hours; otherwise, or when the forecast is
+unavailable or older than 12 hours, the measured outdoor temperature is repeated
+across the horizon. High-grade energy remains diagnostic.
 
 Learned values fall back when required evidence disappears or becomes anomalous.
 Maximum evidence ages are one day for COP/building demand, seven days for capacity,

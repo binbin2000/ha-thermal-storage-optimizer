@@ -12,6 +12,7 @@ from .demand import HeatDemandConfig, estimate_heat_demand_kwh
 if TYPE_CHECKING:
     from .cop import CopModel
     from .price import PriceForecast
+    from .weather import OutdoorForecast
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,8 +62,14 @@ def build_economic_forecast(  # noqa: PLR0913
     cop_model: CopModel,
     demand_config: HeatDemandConfig,
     model_config: ForecastModelConfig,
+    outdoor_forecast: OutdoorForecast | None = None,
 ) -> tuple[EconomicForecastInterval, ...]:
-    """Enrich every non-expired price interval using deterministic models."""
+    """Enrich every non-expired price interval using deterministic models.
+
+    When an hourly outdoor forecast is supplied, each interval uses its own
+    forecast temperature corrected toward the current measurement; otherwise the
+    measured outdoor temperature is repeated across the horizon.
+    """
     if now.tzinfo is None or now.utcoffset() is None:
         msg = "planning time must be timezone-aware"
         raise ValueError(msg)
@@ -75,13 +82,19 @@ def build_economic_forecast(  # noqa: PLR0913
         if duration_seconds <= 0:
             continue
         duration = timedelta(seconds=duration_seconds)
-        demand = estimate_heat_demand_kwh(
-            outdoor_temperature_c, duration, demand_config
-        )
+        outdoor = outdoor_temperature_c
+        if outdoor_forecast is not None:
+            outdoor = outdoor_forecast.interval_temperature(
+                effective_start,
+                price.end,
+                measured_c=outdoor_temperature_c,
+                measured_at=now,
+            )
+        demand = estimate_heat_demand_kwh(outdoor, duration, demand_config)
         cop = measured_cop
         if cop is None or not math.isfinite(cop) or cop <= 0:
             cop = cop_model.estimate(
-                outdoor_temperature_c=outdoor_temperature_c,
+                outdoor_temperature_c=outdoor,
                 supply_temperature_c=supply_temperature_c,
             )
         if not math.isfinite(cop) or cop <= 0:
@@ -97,7 +110,7 @@ def build_economic_forecast(  # noqa: PLR0913
                 price.end,
                 duration,
                 price.marginal_cost_per_kwh,
-                outdoor_temperature_c,
+                outdoor,
                 demand,
                 cop,
                 avoided,

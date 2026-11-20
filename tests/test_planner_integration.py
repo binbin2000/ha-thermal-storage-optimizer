@@ -5,12 +5,13 @@ from unittest.mock import AsyncMock
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.const import STATE_OFF
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.thermal_storage_optimizer.const import (
+    CONF_WEATHER,
     DOMAIN,
     INTEGRATION_NAME,
     UNIQUE_ID,
@@ -213,3 +214,88 @@ async def test_periodic_planning_refreshes_unchanged_inputs(
     assert new.optimized_at > original.optimized_at
     assert new.publication_key == original.publication_key
     assert new.reserve_until == original.reserve_until
+
+
+async def test_hourly_weather_forecast_drives_interval_demand(
+    hass: HomeAssistant,
+) -> None:
+    """Each interval uses its own bias-corrected forecast temperature."""
+    set_valid_required_states(hass)
+    hass.states.async_set("weather.home", "cloudy", {"temperature_unit": "°C"})
+    start = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+
+    async def get_forecasts(_call: ServiceCall) -> dict[str, object]:
+        return {
+            "weather.home": {
+                "forecast": [
+                    {
+                        "datetime": (start + timedelta(hours=index)).isoformat(),
+                        "temperature": 6 - 3 * index,
+                    }
+                    for index in range(12)
+                ]
+            }
+        }
+
+    action = AsyncMock(side_effect=get_forecasts)
+    hass.services.async_register(
+        "weather", "get_forecasts", action, supports_response=SupportsResponse.ONLY
+    )
+    hass.services.async_register("switch", "turn_on", AsyncMock())
+    hass.services.async_register("switch", "turn_off", AsyncMock())
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=INTEGRATION_NAME,
+        unique_id=UNIQUE_ID,
+        data={**REQUIRED_CONFIG, CONF_WEATHER: "weather.home"},
+        version=3,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert action.await_count == 1
+    assert action.await_args.args[0].data["type"] == "hourly"
+    plan = entry.runtime_data.data.plan
+    assert plan is not None
+    temperatures = [item.forecast.outdoor_temperature_c for item in plan.intervals]
+    assert temperatures == sorted(temperatures, reverse=True)
+    assert temperatures[0] > temperatures[-1] + 5
+    assert temperatures[-1] < 0
+    # The measured 5 °C corrects the near-term forecast; the far horizon follows it.
+    assert abs(temperatures[0] - 5) < 1.5
+    assert entry.runtime_data.adapter.outdoor_forecast_error is None
+
+    hass.states.async_set("weather.home", "rainy", {"temperature_unit": "°C"})
+    await hass.async_block_till_done()
+    assert action.await_count == 2
+
+
+async def test_weather_forecast_failure_falls_back_to_measured_outdoor(
+    hass: HomeAssistant,
+) -> None:
+    """An unavailable or malformed forecast never blocks planning."""
+    set_valid_required_states(hass)
+    hass.states.async_set("weather.home", "cloudy", {"temperature_unit": "°C"})
+    hass.services.async_register(
+        "weather",
+        "get_forecasts",
+        AsyncMock(return_value={"weather.home": {"forecast": []}}),
+        supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register("switch", "turn_on", AsyncMock())
+    hass.services.async_register("switch", "turn_off", AsyncMock())
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=INTEGRATION_NAME,
+        unique_id=UNIQUE_ID,
+        data={**REQUIRED_CONFIG, CONF_WEATHER: "weather.home"},
+        version=3,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    plan = entry.runtime_data.data.plan
+    assert plan is not None
+    assert {item.forecast.outdoor_temperature_c for item in plan.intervals} == {5}
+    assert entry.runtime_data.data.plan_status is PlanStatus.FULL_FORECAST
+    assert "too few" in str(entry.runtime_data.adapter.outdoor_forecast_error)

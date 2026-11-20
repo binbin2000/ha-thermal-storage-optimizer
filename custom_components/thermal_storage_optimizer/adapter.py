@@ -50,6 +50,7 @@ from .price import (
     PriceNormalizationConfig,
     normalize_price_forecast,
 )
+from .weather import OutdoorForecast, WeatherForecastError, parse_forecast_response
 
 _KINDS: Final = {
     CONF_TANK_TOP: InputKind.TEMPERATURE,
@@ -75,6 +76,9 @@ _KINDS: Final = {
 _LOGGER = logging.getLogger(__name__)
 _NORDPOOL_DOMAIN: Final = "nordpool"
 _NORDPOOL_GET_PRICES: Final = "get_prices_for_date"
+_WEATHER_DOMAIN: Final = "weather"
+_WEATHER_GET_FORECASTS: Final = "get_forecasts"
+_WEATHER_TEMPERATURE_UNIT: Final = "temperature_unit"
 
 
 class HomeAssistantInputAdapter:
@@ -103,12 +107,30 @@ class HomeAssistantInputAdapter:
         )
         self._nordpool_forecast: PriceForecast | None = None
         self._nordpool_error: str | None = None
+        self._outdoor_forecast: OutdoorForecast | None = None
+        self._outdoor_forecast_error: str | None = None
 
     @property
     def price_entity_id(self) -> str | None:
         """Return the configured price entity ID when present."""
         configured = self._entry_data.get(CONF_PRICE_FORECAST)
         return str(configured) if configured else None
+
+    @property
+    def weather_entity_id(self) -> str | None:
+        """Return the optional weather entity used for hourly forecasts."""
+        configured = self._entry_data.get(CONF_WEATHER)
+        return str(configured) if configured else None
+
+    @property
+    def outdoor_forecast(self) -> OutdoorForecast | None:
+        """Return the last successfully normalized hourly outdoor forecast."""
+        return self._outdoor_forecast
+
+    @property
+    def outdoor_forecast_error(self) -> str | None:
+        """Return why the latest weather forecast refresh was not usable."""
+        return self._outdoor_forecast_error
 
     @property
     def uses_official_nordpool(self) -> bool:
@@ -253,6 +275,41 @@ class HomeAssistantInputAdapter:
             self._nordpool_error = f"Nord Pool response invalid: {err}"
             return
         self._nordpool_error = None
+
+    async def async_prepare_outdoor_forecast(self) -> None:
+        """Fetch the hourly forecast through the core weather response action.
+
+        A failed or malformed refresh keeps the previous forecast; its fetch time
+        bounds how long the planner continues to trust it.
+        """
+        entity_id = self.weather_entity_id
+        if entity_id is None:
+            return
+        state = self._hass.states.get(entity_id)
+        unit = state.attributes.get(_WEATHER_TEMPERATURE_UNIT) if state else None
+        try:
+            response = await self._hass.services.async_call(
+                _WEATHER_DOMAIN,
+                _WEATHER_GET_FORECASTS,
+                {"type": "hourly", "entity_id": entity_id},
+                blocking=True,
+                return_response=True,
+            )
+        except (HomeAssistantError, vol.Invalid) as err:
+            self._outdoor_forecast_error = f"weather forecast fetch failed: {err}"
+            _LOGGER.debug("Hourly weather forecast unavailable: %s", err)
+            return
+        try:
+            self._outdoor_forecast = parse_forecast_response(
+                response,
+                entity_id,
+                temperature_unit=unit,
+                fetched_at=dt_util.utcnow(),
+            )
+        except WeatherForecastError as err:
+            self._outdoor_forecast_error = f"weather forecast invalid: {err}"
+            return
+        self._outdoor_forecast_error = None
 
     def _official_nordpool_source(  # noqa: PLR0911
         self,
