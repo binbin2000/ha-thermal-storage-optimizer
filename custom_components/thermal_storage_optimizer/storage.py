@@ -31,6 +31,7 @@ def serialize_plan(plan: OptimizationPlan) -> dict[str, Any]:
                 "retention": item.forecast.retention,
                 "confidence": item.forecast.confidence,
                 "adjusted_value_per_kwh": item.forecast.adjusted_value_per_kwh,
+                "supply_temperature_c": item.forecast.supply_temperature_c,
                 "allocated_energy_kwh": item.allocated_energy_kwh,
                 "expected_savings": item.expected_savings,
             }
@@ -73,6 +74,11 @@ def deserialize_plan(  # noqa: PLR0911
                 retention=float(raw["retention"]),
                 confidence=float(raw["confidence"]),
                 adjusted_value_per_kwh=float(raw["adjusted_value_per_kwh"]),
+                supply_temperature_c=(
+                    float(raw["supply_temperature_c"])
+                    if raw.get("supply_temperature_c") is not None
+                    else None
+                ),
             )
             periods.append(
                 PlannedInterval(

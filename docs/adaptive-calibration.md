@@ -33,3 +33,24 @@ left inactive with an explicit fallback reason. Persistence schema version 2 acc
 the bounded version-1 shape during migration and rejects unknown or malformed data.
 The reset action does not touch the saved optimization plan, controller mode, safety
 latch, actuator state, or active advisor-session continuity.
+
+## Learned temperature curves
+
+Temperature-curve learning is a separate opt-in (**Learn temperature-dependent
+curves**). It records one sample per outdoor-temperature bin at most every 30
+minutes, keeps at most 48 samples per bin and 30 bins, and forgets samples older
+than 30 days so a changed heat-pump setting is unlearned automatically. Each bin
+reports its centre, robust median, sample count, and confidence on the **Learned
+temperature curves** diagnostic entity and in integration diagnostics.
+
+| Curve | Samples | Used for |
+| --- | --- | --- |
+| Heating curve | Supply target versus outdoor temperature from the two required entities | The supply target of each forecast interval at that interval's outdoor temperature |
+
+A lookup uses the matching bin's median, linear interpolation between the two
+nearest confident bins, or the nearest confident bin (with reduced confidence)
+outside the learned range. At least two confident bins are required before any
+learned value replaces the measured supply target. The supply-target entity must
+come from the heat pump, not from the shunt controller downstream of the tank,
+because the reserve offset would otherwise poison the curve. The reset action
+clears the learned curves together with adaptive calibration.

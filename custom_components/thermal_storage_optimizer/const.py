@@ -197,3 +197,11 @@ OPTIONAL_ENTITY_KEYS: Final = (
 
 CONF_REPLAN_INTERVAL: Final = "replan_interval_minutes"
 DEFAULT_REPLAN_INTERVAL: Final = 15
+
+CONF_TEMPERATURE_CURVES: Final = "temperature_curves_enabled"
+CONF_CURVE_BIN_WIDTH: Final = "curve_bin_width_c"
+CONF_CURVE_MIN_CONFIDENCE: Final = "curve_min_confidence"
+DEFAULT_TEMPERATURE_CURVES: Final = False
+DEFAULT_CURVE_BIN_WIDTH: Final = 3.0
+DEFAULT_CURVE_MIN_CONFIDENCE: Final = 0.6
+SUPPLY_TEMPERATURE_LIMITS_C: Final = (10.0, 90.0)

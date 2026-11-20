@@ -125,7 +125,10 @@
           "wood_cost_per_kg": "Vedkostnad (valfri)",
           "wood_energy_content_kwh_per_kg": "Vedens energiinnehåll (valfritt)",
           "stove_to_tank_efficiency": "Verkningsgrad kamin till tank (valfri)",
-          "replan_interval_minutes": "Planning interval (minutes)"
+          "replan_interval_minutes": "Planning interval (minutes)",
+          "temperature_curves_enabled": "Lär in temperaturberoende kurvor (värmekurva)",
+          "curve_bin_width_c": "Binbredd för inlärda kurvor (°C ute)",
+          "curve_min_confidence": "Lägsta konfidens för inlärda kurvor"
         },
         "data_description": {
           "sensor_stale_after": "Högsta ålder för temperaturer och valfria mätvärden.",

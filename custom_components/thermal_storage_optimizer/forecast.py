@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
@@ -50,6 +51,7 @@ class EconomicForecastInterval:
     retention: float
     confidence: float
     adjusted_value_per_kwh: float
+    supply_temperature_c: float | None = None
 
 
 def build_economic_forecast(  # noqa: PLR0913
@@ -63,12 +65,15 @@ def build_economic_forecast(  # noqa: PLR0913
     demand_config: HeatDemandConfig,
     model_config: ForecastModelConfig,
     outdoor_forecast: OutdoorForecast | None = None,
+    supply_temperature_for: Callable[[float], float] | None = None,
 ) -> tuple[EconomicForecastInterval, ...]:
     """Enrich every non-expired price interval using deterministic models.
 
     When an hourly outdoor forecast is supplied, each interval uses its own
     forecast temperature corrected toward the current measurement; otherwise the
-    measured outdoor temperature is repeated across the horizon.
+    measured outdoor temperature is repeated across the horizon. A learned
+    heating curve likewise maps each interval's outdoor temperature to a supply
+    target; otherwise the current supply target is repeated.
     """
     if now.tzinfo is None or now.utcoffset() is None:
         msg = "planning time must be timezone-aware"
@@ -90,12 +95,18 @@ def build_economic_forecast(  # noqa: PLR0913
                 measured_c=outdoor_temperature_c,
                 measured_at=now,
             )
+        supply = supply_temperature_c
+        if supply_temperature_for is not None:
+            supply = supply_temperature_for(outdoor)
+            if not math.isfinite(supply):
+                msg = "learned supply temperature must be finite"
+                raise ValueError(msg)
         demand = estimate_heat_demand_kwh(outdoor, duration, demand_config)
         cop = measured_cop
         if cop is None or not math.isfinite(cop) or cop <= 0:
             cop = cop_model.estimate(
                 outdoor_temperature_c=outdoor,
-                supply_temperature_c=supply_temperature_c,
+                supply_temperature_c=supply,
             )
         if not math.isfinite(cop) or cop <= 0:
             msg = "COP must be finite and positive"
@@ -117,6 +128,7 @@ def build_economic_forecast(  # noqa: PLR0913
                 retention,
                 model_config.confidence,
                 adjusted,
+                supply,
             )
         )
     return tuple(result)

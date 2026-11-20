@@ -76,6 +76,9 @@ required input set.
 | Forecast confidence | 0.85 | 0–1 | Conservative discount applied to forecast value. |
 | Economic deadband | 0.05 currency/kWh heat | 0–100 | Minimum advantage over the horizon baseline before tank energy is allocated. |
 | Planning interval | 15 min | 1–60 min | Periodic plan refresh interval; relevant state changes can also trigger a refresh. |
+| Learn temperature-dependent curves | Off | On/off | Learns the heat pump's heating curve (supply target versus outdoor temperature) from the configured supply-target and outdoor entities. When enough confident bins exist, each forecast interval uses the learned supply target for its own outdoor temperature. Off keeps the current supply target for every interval. |
+| Learned curve bin width | 3 °C | 1–10 °C | Outdoor-temperature width of each learned bin. Narrower bins resolve a kinked curve better but need more samples. |
+| Minimum learned curve confidence | 0.6 | 0.3–1 | Confidence a bin needs before it is used. Confidence grows with sample count (full at twice the six-sample minimum) and shrinks with spread inside the bin. |
 
 The next-hour demand model is `heat-loss coefficient × max(balance temperature −
 outdoor temperature, 0)`. Tank energy is calculated from the configured effective

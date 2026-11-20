@@ -277,7 +277,11 @@ again during firing. When a weather entity is selected, each forecast interval
 uses the hourly outdoor forecast at its midpoint, corrected toward the measured
 outdoor temperature for the first six hours; otherwise, or when the forecast is
 unavailable or older than 12 hours, the measured outdoor temperature is repeated
-across the horizon. High-grade energy remains diagnostic.
+across the horizon. With **Learn temperature-dependent curves** enabled, the
+heat pump's heating curve is learned from the supply-target and outdoor entities
+in bounded outdoor-temperature bins, and each interval's supply target follows
+its own outdoor temperature once enough confident bins exist. High-grade energy
+remains diagnostic.
 
 Learned values fall back when required evidence disappears or becomes anomalous.
 Maximum evidence ages are one day for COP/building demand, seven days for capacity,

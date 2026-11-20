@@ -125,7 +125,10 @@
           "wood_cost_per_kg": "Wood cost (optional)",
           "wood_energy_content_kwh_per_kg": "Wood energy content (optional)",
           "stove_to_tank_efficiency": "Stove-to-tank efficiency (optional)",
-          "replan_interval_minutes": "Planning interval (minutes)"
+          "replan_interval_minutes": "Planning interval (minutes)",
+          "temperature_curves_enabled": "Learn temperature-dependent curves (heating curve)",
+          "curve_bin_width_c": "Learned curve bin width (°C outdoor)",
+          "curve_min_confidence": "Minimum learned curve confidence"
         },
         "data_description": {
           "sensor_stale_after": "Maximum age for temperature and optional measurement updates.",

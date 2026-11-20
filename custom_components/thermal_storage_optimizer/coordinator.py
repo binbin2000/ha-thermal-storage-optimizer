@@ -40,6 +40,8 @@ from .const import (
     CONF_CHARGING_POWER_MIN,
     CONF_COP_MAX,
     CONF_COP_MIN,
+    CONF_CURVE_BIN_WIDTH,
+    CONF_CURVE_MIN_CONFIDENCE,
     CONF_ECONOMIC_DEADBAND,
     CONF_FIXED_COP,
     CONF_FORECAST_CONFIDENCE,
@@ -67,6 +69,7 @@ from .const import (
     CONF_TANK_BOTTOM,
     CONF_TANK_MIDDLE,
     CONF_TANK_TOP,
+    CONF_TEMPERATURE_CURVES,
     CONF_TOP_LAYER_VOLUME,
     CONF_TOTAL_TANK_VOLUME,
     CONF_TREND_DEADBAND,
@@ -83,6 +86,8 @@ from .const import (
     DEFAULT_CHARGING_POWER_MIN,
     DEFAULT_COP_MAX,
     DEFAULT_COP_MIN,
+    DEFAULT_CURVE_BIN_WIDTH,
+    DEFAULT_CURVE_MIN_CONFIDENCE,
     DEFAULT_ECONOMIC_DEADBAND,
     DEFAULT_FIXED_COP,
     DEFAULT_FORECAST_CONFIDENCE,
@@ -99,13 +104,16 @@ from .const import (
     DEFAULT_RESIDUAL_MAX,
     DEFAULT_RESIDUAL_MIN,
     DEFAULT_STOVE_TEMPERATURE_THRESHOLD,
+    DEFAULT_TEMPERATURE_CURVES,
     DEFAULT_TOTAL_TANK_VOLUME,
     DEFAULT_TREND_DEADBAND,
     DEFAULT_USABLE_CAPACITY,
     DOMAIN,
+    SUPPLY_TEMPERATURE_LIMITS_C,
 )
 from .controller import OperatingState, SupervisoryController
 from .cop import CopEstimate, CopSource, FixedCopModel, estimate_cop
+from .curves import CurveConfig, TemperatureCurveSet
 from .data import PlanStatus, RuntimeSnapshot
 from .demand import HeatDemandConfig, estimate_heat_demand_kwh
 from .energy import TankTemperatures, ThermalEnergyConfig, estimate_thermal_state
@@ -250,6 +258,22 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                 ),
             )
         )
+        self._curve_store = Store[dict[str, object]](
+            hass, 1, f"{DOMAIN}.{entry.entry_id}.curves"
+        )
+        self.curves = TemperatureCurveSet(
+            CurveConfig(
+                enabled=options.get(CONF_TEMPERATURE_CURVES, DEFAULT_TEMPERATURE_CURVES)
+                is True,
+                bin_width_c=_option(
+                    options, CONF_CURVE_BIN_WIDTH, DEFAULT_CURVE_BIN_WIDTH
+                ),
+                minimum_confidence=_option(
+                    options, CONF_CURVE_MIN_CONFIDENCE, DEFAULT_CURVE_MIN_CONFIDENCE
+                ),
+                supply_bounds=ParameterBounds(*SUPPLY_TEMPERATURE_LIMITS_C),
+            )
+        )
         self._prices: PriceForecast | None = None
         self._planning_inputs: tuple[object, ...] | None = None
         self._reserve_until: datetime | None = None
@@ -277,6 +301,10 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
         stored = await self._store.async_load()
         calibration = await self._calibration_store.async_load()
         self.calibration.restore(calibration, now=self._adapter.snapshot().captured_at)
+        self.curves.restore(
+            await self._curve_store.async_load(),
+            now=self._adapter.snapshot().captured_at,
+        )
         self._plan = deserialize_plan(stored, now=self._adapter.snapshot().captured_at)
         self._plan_loaded_from_storage = self._plan is not None
         if self._plan is not None:
@@ -439,6 +467,17 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
         )
         outdoor = _numeric_value(inputs, CONF_OUTDOOR_TEMPERATURE)
         supply_target = _numeric_value(inputs, CONF_SUPPLY_TARGET)
+        if self.curves.observe(
+            now=inputs.captured_at,
+            outdoor_c=outdoor,
+            supply_target_c=supply_target,
+        ):
+            # Samples are accepted at most once per bin per 30 minutes, so an
+            # immediate save stays infrequent and survives reload without a flush.
+            self.hass.async_create_task(
+                self._curve_store.async_save(self.curves.serialize()),
+                f"save {DOMAIN} temperature curves",
+            )
         hourly_demand = None
         cop = None
         if outdoor is not None:
@@ -536,7 +575,9 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
     async def async_reset_calibration(self) -> None:
         """Reset adaptive values without touching plans, modes, or safety state."""
         self.calibration.reset()
+        self.curves.reset()
         await self._calibration_store.async_save(self.calibration.serialize())
+        await self._curve_store.async_save(self.curves.serialize())
         self._refresh_snapshot()
 
     def _update_plan(  # noqa: C901, PLR0911, PLR0913, PLR0917
@@ -604,6 +645,8 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             demand_config,
             cop_model,
             outdoor_forecast,
+            # Only a usable curve changes the plan; learning alone must not churn it.
+            self.curves.revision if self.curves.heating_curve_usable(now) else None,
         )
         if (
             not self._force_recalculation
@@ -654,6 +697,13 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             demand_config=demand_config,
             model_config=model_config,
             outdoor_forecast=outdoor_forecast,
+            supply_temperature_for=(
+                lambda outdoor: self.curves.supply_temperature_for(
+                    outdoor, now=now, fallback_c=float(supply_temperature_c)
+                )
+            )
+            if self.curves.heating_curve_usable(now)
+            else None,
         )
         if not forecast:
             if self._plan is not None:

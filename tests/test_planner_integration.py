@@ -11,6 +11,7 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.thermal_storage_optimizer.const import (
+    CONF_TEMPERATURE_CURVES,
     CONF_WEATHER,
     DOMAIN,
     INTEGRATION_NAME,
@@ -35,6 +36,27 @@ def _state(hass: HomeAssistant, entity_id: str):  # noqa: ANN202
     result = hass.states.get(entity_id)
     assert result is not None
     return result
+
+
+def _publish_prices(hass: HomeAssistant) -> None:
+    """Publish a six-hour price fixture starting at the current hour."""
+    start = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    hass.states.async_set(
+        "sensor.price_forecast",
+        "published",
+        {
+            "unit_of_measurement": "SEK/kWh",
+            "publication_id": f"rolling-{start.isoformat()}",
+            "prices": [
+                {
+                    "start": (start + timedelta(hours=index)).isoformat(),
+                    "end": (start + timedelta(hours=index + 1)).isoformat(),
+                    "price": price,
+                }
+                for index, price in enumerate((0.5, 0.4, 1.4, 0.7, 1.8, 0.6))
+            ],
+        },
+    )
 
 
 async def _setup(hass: HomeAssistant, output_service: AsyncMock) -> MockConfigEntry:
@@ -299,3 +321,77 @@ async def test_weather_forecast_failure_falls_back_to_measured_outdoor(
     assert {item.forecast.outdoor_temperature_c for item in plan.intervals} == {5}
     assert entry.runtime_data.data.plan_status is PlanStatus.FULL_FORECAST
     assert "too few" in str(entry.runtime_data.adapter.outdoor_forecast_error)
+
+
+async def test_learned_heating_curve_sets_interval_supply_targets(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Enabled curve learning fills bins and the forecast uses them per interval."""
+    set_valid_required_states(hass)
+    hass.services.async_register("switch", "turn_on", AsyncMock())
+    hass.services.async_register("switch", "turn_off", AsyncMock())
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=INTEGRATION_NAME,
+        unique_id=UNIQUE_ID,
+        data=REQUIRED_CONFIG,
+        options={CONF_TEMPERATURE_CURVES: True},
+        version=3,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data
+    curve_id = _entity_id(hass, "sensor", f"{entry.entry_id}_temperature_curves")
+    assert _state(hass, curve_id).state == "learning"
+    assert all(
+        item.forecast.supply_temperature_c == 45
+        for item in coordinator.data.plan.intervals
+    )
+
+    # Alternate between a mild and a cold bin with a 1.2 K/K reference curve.
+    # Republish prices each step so the fixture horizon never expires.
+    for index in range(16):
+        outdoor = 4.0 if index % 2 else -5.0
+        freezer.tick(timedelta(minutes=31))
+        _publish_prices(hass)
+        for entity_id, value in (
+            ("sensor.tank_top", "60"),
+            ("sensor.tank_middle", "50"),
+            ("sensor.tank_bottom", "40"),
+            ("sensor.return_temperature", "30"),
+        ):
+            hass.states.async_set(
+                entity_id, value, {"unit_of_measurement": "°C"}, force_update=True
+            )
+        hass.states.async_set(
+            "sensor.supply_target",
+            str(20 + 1.2 * (17 - outdoor)),
+            {"unit_of_measurement": "°C"},
+        )
+        hass.states.async_set(
+            "sensor.outdoor_temperature", str(outdoor), {"unit_of_measurement": "°C"}
+        )
+        await hass.async_block_till_done()
+    assert _state(hass, curve_id).state == "active"
+    bins = _state(hass, curve_id).attributes["heating_curve"]["bins"]
+    assert len(bins) == 2
+    plan = coordinator.data.plan
+    assert plan is not None
+    # The last measured outdoor temperature is 4 °C, so every interval uses the
+    # learned mild-bin supply target instead of the raw current setpoint.
+    assert {
+        round(item.forecast.supply_temperature_c or 0, 1) for item in plan.intervals
+    } == {round(20 + 1.2 * (17 - 4.0), 1)}
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _state(hass, curve_id).state == "active"
+
+    response = await hass.services.async_call(
+        DOMAIN, "reset_learned_state", blocking=True, return_response=True
+    )
+    assert "heating_curve" in response["reset_items"]
+    assert _state(hass, curve_id).state == "learning"

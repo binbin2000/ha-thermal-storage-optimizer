@@ -60,6 +60,11 @@ def build_plan_summary(
                     "outdoor_temperature_c": round(
                         item.forecast.outdoor_temperature_c, 2
                     ),
+                    "supply_temperature_c": (
+                        round(item.forecast.supply_temperature_c, 2)
+                        if item.forecast.supply_temperature_c is not None
+                        else None
+                    ),
                     "heat_demand_kwh": round(item.forecast.heat_demand_kwh, 3),
                     "electricity_cost_per_kwh": round(
                         item.forecast.electricity_cost_per_kwh, 4

@@ -12,6 +12,11 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
   outdoor temperature over the first six hours and falls back to the measured value
   when unavailable, malformed, or stale. Diagnostics and the plan summary report
   the forecast state and per-interval outdoor temperature.
+- Optional learned heating curve: with **Learn temperature-dependent curves**
+  enabled, the supply target is learned per outdoor-temperature bin from the
+  configured entities and applied per forecast interval. Bins are bounded, aged
+  out after 30 days, exposed on a new **Learned temperature curves** diagnostic
+  entity, persisted across restarts, and cleared by the reset action.
 
 ## [1.0.0] - 2026-09-08
 

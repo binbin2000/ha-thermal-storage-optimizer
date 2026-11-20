@@ -110,6 +110,7 @@ async def async_get_config_entry_diagnostics(
             "error": coordinator.adapter.outdoor_forecast_error,
         },
         "adaptive_calibration": coordinator.calibration.diagnostics(),
+        "temperature_curves": coordinator.curves.diagnostics(data.captured_at),
         "performance_validation": {
             "comparison_samples": performance.comparison_samples,
             "modeled_heat_kwh": performance.modeled_heat_kwh,

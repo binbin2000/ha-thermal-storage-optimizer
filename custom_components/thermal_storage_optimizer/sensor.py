@@ -216,6 +216,7 @@ async def async_setup_entry(
             ThermalStorageOptimizerOperatingStateSensor(entry),
             ThermalStorageOptimizerControllerReasonSensor(entry),
             ThermalStorageOptimizerCalibrationStatusSensor(entry),
+            ThermalStorageOptimizerCurveStatusSensor(entry),
             *(
                 ThermalStorageOptimizerAdvisorSensor(entry, description)
                 for description in ADVISOR_SENSORS
@@ -278,6 +279,44 @@ class ThermalStorageOptimizerCalibrationStatusSensor(
                 "fallback_reason": report.fallback_reason,
             },
         }
+
+
+class ThermalStorageOptimizerCurveStatusSensor(
+    CoordinatorEntity[InputCoordinator], SensorEntity
+):
+    """Expose learned outdoor-temperature curves without raw samples."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Learned temperature curves"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, entry: ConfigEntry[InputCoordinator]) -> None:
+        """Initialize the curve status entity."""
+        super().__init__(entry.runtime_data)
+        self._attr_unique_id = f"{entry.entry_id}_temperature_curves"
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, entry.entry_id)})
+
+    @property
+    def native_value(self) -> str:
+        """Return disabled, learning, or active."""
+        curves = self.coordinator.curves
+        if not curves.config.enabled:
+            return "disabled"
+        now = self.coordinator.data.captured_at
+        if any(
+            curve.usable(now, curves.config.minimum_confidence)
+            for curve in curves.curves.values()
+        ):
+            return "active"
+        return "learning"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        """Return bounded per-bin medians and confidence for each curve."""
+        diagnostics = self.coordinator.curves.diagnostics(
+            self.coordinator.data.captured_at
+        )
+        return cast("dict[str, object]", diagnostics["curves"])
 
 
 class ThermalStorageOptimizerStatusSensor(
