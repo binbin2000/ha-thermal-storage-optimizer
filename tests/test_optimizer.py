@@ -297,3 +297,78 @@ def test_rolling_binary_controller_conserves_heat_with_losses() -> None:
         if second >= 3600:
             later_delivered += discharge
     assert later_delivered == pytest.approx(3, abs=0.02)
+
+
+def test_quarter_hour_resolution_allocates_contiguous_runs_with_dwell() -> None:
+    """Fifteen-minute market periods form releases longer than the 30-minute dwell."""
+    periods = tuple(
+        economic(
+            index / 4,
+            0.25,
+            2.5 if 24 <= index < 36 else (1.8 if 8 <= index < 12 else 0.6),
+            1.65,
+        )
+        for index in range(96)
+    )
+    plan = optimize_plan(
+        periods,
+        publication_key="quarter-hour",
+        optimized_at=NOW,
+        available_energy_kwh=15,
+        economic_deadband_per_kwh=0.05,
+        minimum_dwell_seconds=1800,
+    )
+    allocated = [i for i, p in enumerate(plan.intervals) if p.allocated_energy_kwh > 0]
+    # The partial period leads the window; every later period is fully allocated.
+    assert allocated == list(range(24, 34))
+    assert plan.intervals[24].allocated_energy_kwh < 1.65
+    assert all(plan.intervals[i].allocated_energy_kwh == 1.65 for i in range(25, 34))
+    assert sum(p.allocated_energy_kwh for p in plan.intervals) == pytest.approx(15)
+    assert plan.retained_beyond_horizon_kwh == pytest.approx(0)
+    window = plan.intervals[33].forecast.end - plan.intervals[24].release_start
+    assert window == timedelta(hours=15 / 1.65 / 4)
+
+
+def test_isolated_short_period_is_dropped_and_energy_reallocated() -> None:
+    """A lone 15-minute peak cannot be realized; its energy goes to a longer run."""
+    periods = (
+        economic(0, 0.25, 5.0, 1.0),
+        economic(0.25, 0.25, 0.1, 1.0),
+        economic(0.5, 0.25, 2.0, 1.0),
+        economic(0.75, 0.25, 2.0, 1.0),
+        economic(1.0, 0.25, 2.0, 1.0),
+        economic(1.25, 0.25, 0.1, 1.0),
+    )
+    plan = optimize_plan(
+        periods,
+        publication_key="isolated",
+        optimized_at=NOW,
+        available_energy_kwh=2.5,
+        economic_deadband_per_kwh=0.05,
+        minimum_dwell_seconds=1800,
+    )
+    assert [p.allocated_energy_kwh for p in plan.intervals] == pytest.approx(
+        [0, 0, 0.5, 1, 1, 0]
+    )
+    assert plan.recommendation_at(NOW) is Recommendation.RESERVE_TANK
+    assert plan.intervals[2].release_start == NOW + timedelta(minutes=37, seconds=30)
+
+
+def test_active_short_release_continues_at_quarter_hour_resolution() -> None:
+    """An ongoing release is not cancelled by the run rule during replanning."""
+    periods = (
+        economic(0, 0.1, 3.0, 0.4),
+        economic(0.1, 0.25, 0.1, 1.0),
+        economic(0.35, 0.25, 0.1, 1.0),
+    )
+    plan = optimize_plan(
+        periods,
+        publication_key="continuing",
+        optimized_at=NOW,
+        available_energy_kwh=5,
+        economic_deadband_per_kwh=0.05,
+        minimum_dwell_seconds=1800,
+        current_release_active=True,
+    )
+    assert plan.intervals[0].allocated_energy_kwh == pytest.approx(0.4)
+    assert plan.recommendation_at(NOW) is Recommendation.USE_TANK

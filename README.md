@@ -250,9 +250,14 @@ publication does not prevent allocating against those prices with current inputs
 Saved prices and the reservation deadline survive restart.
 
 Each allocation is delivered during a bounded window ending at its price interval
-boundary. Scheduled callbacks update control at window boundaries. New windows
-must satisfy minimum dwell, and observed tank energy protects heat committed to
-later intervals; that budget stop takes priority over dwell in Auto. Manual use
+boundary. Scheduled callbacks update control at window boundaries. Minimum dwell
+is enforced on contiguous release windows rather than single price periods, so
+15-minute market resolution still allows multi-hour releases: consecutive
+allocated periods form one window with any partial release at its front, releases
+too short to realize are dropped (a lone period that can never reach the dwell
+first), and reserve gaps shorter than the dwell drop the smaller release.
+Observed tank energy protects heat committed to later intervals; that budget stop
+takes priority over dwell in Auto. Manual use
 and the independent high-temperature override can consume reserved heat. Dispatch
 still depends on estimated demand and sensor update latency and requires field
 commissioning.

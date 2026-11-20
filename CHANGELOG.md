@@ -25,6 +25,16 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
   fallback. The COP source entity gains `learned_curve` and
   `carnot_extrapolation` states.
 
+### Fixed
+
+- Minimum output dwell now applies to contiguous release windows instead of
+  each price period. With 15-minute market resolution and the default 30-minute
+  dwell, every period was shorter than the dwell and no tank energy was ever
+  allocated. A chain of consecutive periods is now laid out as one window with
+  the partial release at its front, a lone period that can never reach the dwell
+  yields its energy to a broad peak, and reserve gaps shorter than the dwell
+  drop the smaller release.
+
 ## [1.0.0] - 2026-09-08
 
 ### Added
