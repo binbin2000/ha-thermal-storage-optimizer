@@ -66,6 +66,9 @@ from .const import (
     CONF_STOVE_CHARGING_PUMP,
     CONF_STOVE_FLOW_TEMPERATURE,
     CONF_STOVE_TEMPERATURE_THRESHOLD,
+    CONF_SUPPLEMENTARY_HEATER_POWER,
+    CONF_SUPPLEMENTARY_HEATER_RATED_POWER,
+    CONF_SUPPLEMENTARY_HEATER_SHARE,
     CONF_SUPPLY_TARGET,
     CONF_TANK_BOTTOM,
     CONF_TANK_MIDDLE,
@@ -105,6 +108,7 @@ from .const import (
     DEFAULT_RESIDUAL_MAX,
     DEFAULT_RESIDUAL_MIN,
     DEFAULT_STOVE_TEMPERATURE_THRESHOLD,
+    DEFAULT_SUPPLEMENTARY_HEATER_RATED_POWER,
     DEFAULT_TEMPERATURE_CURVES,
     DEFAULT_TOTAL_TANK_VOLUME,
     DEFAULT_TREND_DEADBAND,
@@ -113,7 +117,7 @@ from .const import (
     SUPPLY_TEMPERATURE_LIMITS_C,
 )
 from .controller import OperatingState, SupervisoryController
-from .cop import CopEstimate, CopSource, FixedCopModel, estimate_cop
+from .cop import CopEstimate, CopSource, FixedCopModel, estimate_cop, system_cop
 from .curves import CurveConfig, TemperatureCurveSet
 from .data import PlanStatus, RuntimeSnapshot
 from .demand import HeatDemandConfig, estimate_heat_demand_kwh
@@ -472,13 +476,14 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
         )
         outdoor = _numeric_value(inputs, CONF_OUTDOOR_TEMPERATURE)
         supply_target = _numeric_value(inputs, CONF_SUPPLY_TARGET)
-        measured_cop = _numeric_value(inputs, CONF_MEASURED_COP)
+        measured_cop, heater_share = self._effective_measured_cop(inputs)
         if self.curves.observe(
             now=inputs.captured_at,
             outdoor_c=outdoor,
             supply_target_c=supply_target,
             measured_cop=measured_cop,
             heat_pump_power_kw=_numeric_value(inputs, CONF_HEAT_PUMP_ELECTRICAL_POWER),
+            heater_heat_share=heater_share,
         ):
             # Samples are accepted at most once per bin per 30 minutes, so an
             # immediate save stays infrequent and survives reload without a flush.
@@ -528,6 +533,7 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             _bounded_explanation(reason),
             recommendation,
             rejected,
+            supplementary_heat_share=heater_share,
         )
         self.has_received_valid_data = self.has_received_valid_data or inputs.is_valid
         self.async_set_updated_data(snapshot)
@@ -572,6 +578,46 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                     self._calibration_store.async_save(self.calibration.serialize()),
                     f"save {DOMAIN} calibration",
                 )
+
+    def _effective_measured_cop(
+        self, inputs: NormalizedInputSnapshot
+    ) -> tuple[float | None, float | None]:
+        """Return the measured COP and the supplementary heater's heat share.
+
+        When heat-pump electrical power and supplementary heater power are both
+        known, the measured compressor COP is combined into the system's
+        effective COP, because the resistive heater delivers its share at COP 1.
+        """
+        measured_cop = _numeric_value(inputs, CONF_MEASURED_COP)
+        heat_pump_power = _numeric_value(inputs, CONF_HEAT_PUMP_ELECTRICAL_POWER)
+        heater_power = self._supplementary_heater_power_kw(inputs)
+        if measured_cop is None or heat_pump_power is None or heater_power is None:
+            return measured_cop, None
+        combined = system_cop(
+            heat_pump_cop=measured_cop,
+            heat_pump_power_kw=heat_pump_power,
+            heater_power_kw=heater_power,
+        )
+        if combined is None:
+            return measured_cop, None
+        return combined.value, combined.heater_heat_share
+
+    def _supplementary_heater_power_kw(
+        self, inputs: NormalizedInputSnapshot
+    ) -> float | None:
+        """Return heater electrical power from the power entity or share x rating."""
+        power = _numeric_value(inputs, CONF_SUPPLEMENTARY_HEATER_POWER)
+        if power is not None:
+            return max(power, 0.0)
+        share = _numeric_value(inputs, CONF_SUPPLEMENTARY_HEATER_SHARE)
+        if share is None:
+            return None
+        rated = _option(
+            dict(self._entry.options),
+            CONF_SUPPLEMENTARY_HEATER_RATED_POWER,
+            DEFAULT_SUPPLEMENTARY_HEATER_RATED_POWER,
+        )
+        return max(share, 0.0) / 100.0 * rated
 
     def _cancel_dispatch_timer(self) -> None:
         """Replace or remove the timer for the next binary dispatch boundary."""

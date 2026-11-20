@@ -24,6 +24,11 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
   beyond the observed range, and the fixed or calibrated value remains the last
   fallback. The COP source entity gains `learned_curve` and
   `carnot_extrapolation` states.
+- Optional supplementary electric heater inputs (electrical power, or output
+  share with a rated power option). With the heat-pump electrical power and the
+  measured COP, the planner uses the system's effective COP, learns the heater's
+  heat share per outdoor-temperature bin, reports the learned balance point in
+  diagnostics, and exposes the current heater heat share as a diagnostic sensor.
 
 ### Fixed
 

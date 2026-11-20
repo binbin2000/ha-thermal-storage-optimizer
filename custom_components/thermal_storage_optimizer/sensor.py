@@ -140,6 +140,19 @@ CALCULATED_SENSORS: tuple[CalculatedSensorDescription, ...] = (
         value_fn=lambda data: data.cop.value if data.cop is not None else None,
     ),
     CalculatedSensorDescription(
+        key="supplementary_heat_share",
+        translation_key="supplementary_heat_share",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        suggested_display_precision=0,
+        value_fn=lambda data: (
+            data.supplementary_heat_share * 100
+            if data.supplementary_heat_share is not None
+            else None
+        ),
+    ),
+    CalculatedSensorDescription(
         key="cop_source",
         translation_key="cop_source",
         device_class=SensorDeviceClass.ENUM,

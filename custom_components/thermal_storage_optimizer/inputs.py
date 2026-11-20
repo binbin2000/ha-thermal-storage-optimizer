@@ -19,6 +19,7 @@ class InputKind(StrEnum):
     ENERGY = "energy"
     COP = "cop"
     FLOW_RATE = "flow_rate"
+    PERCENTAGE = "percentage"
     AVAILABILITY = "availability"
     DIGITAL = "digital"
 
@@ -110,6 +111,7 @@ _CANONICAL_UNITS: Final = {
     InputKind.ENERGY: "kWh",
     InputKind.COP: None,
     InputKind.FLOW_RATE: "L/min",
+    InputKind.PERCENTAGE: "%",
 }
 
 
@@ -218,6 +220,8 @@ def _convert_value(kind: InputKind, value: float, unit: str | None) -> float | N
         return value if normalized_unit in {None, "", "cop"} and value > 0 else None
     if kind is InputKind.TEMPERATURE:
         return convert_temperature_to_celsius(value, unit)
+    if kind is InputKind.PERCENTAGE:
+        return value if normalized_unit == "%" and 0 <= value <= 100 else None  # noqa: PLR2004
     if kind is InputKind.POWER:
         factor = _POWER_FACTORS.get(normalized_unit or "")
     elif kind is InputKind.ENERGY:

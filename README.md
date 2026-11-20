@@ -288,8 +288,11 @@ in bounded outdoor-temperature bins, and each interval's supply target follows
 its own outdoor temperature once enough confident bins exist. A configured
 measured-COP entity additionally teaches COP per outdoor-temperature bin, so each
 interval's avoided heat cost reflects the colder hours' lower COP; a learned
-Carnot efficiency extrapolates below the observed range. High-grade energy
-remains diagnostic.
+Carnot efficiency extrapolates below the observed range. With separate heat-pump
+and supplementary-heater electrical power entities, the measured compressor COP
+is combined into the system's effective COP, so hours in which the immersion
+heater runs are valued at their true heat cost. High-grade energy remains
+diagnostic.
 
 Learned values fall back when required evidence disappears or becomes anomalous.
 Maximum evidence ages are one day for COP/building demand, seven days for capacity,

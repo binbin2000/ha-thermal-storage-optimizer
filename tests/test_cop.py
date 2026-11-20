@@ -12,6 +12,7 @@ from custom_components.thermal_storage_optimizer.cop import (
     carnot_cop,
     carnot_efficiency,
     estimate_cop,
+    system_cop,
 )
 from custom_components.thermal_storage_optimizer.curves import (
     MIN_BIN_SAMPLE_INTERVAL,
@@ -129,3 +130,35 @@ def timedelta_hours(hours: float):  # noqa: ANN201
     from datetime import timedelta  # noqa: PLC0415
 
     return timedelta(hours=hours)
+
+
+def test_system_cop_blends_heater_at_unity() -> None:
+    """A resistive heater pulls the effective COP toward one by its heat share."""
+    combined = system_cop(
+        heat_pump_cop=3.0, heat_pump_power_kw=2.0, heater_power_kw=3.0
+    )
+    assert combined is not None
+    assert combined.value == pytest.approx(9 / 5)
+    assert combined.heater_heat_share == pytest.approx(3 / 9)
+    alone = system_cop(heat_pump_cop=3.0, heat_pump_power_kw=2.0, heater_power_kw=0.0)
+    assert alone is not None
+    assert alone.value == 3.0
+    assert alone.heater_heat_share == 0
+    assert (
+        system_cop(heat_pump_cop=3.0, heat_pump_power_kw=0.0, heater_power_kw=0.0)
+        is None
+    )
+    assert (
+        system_cop(heat_pump_cop=0.0, heat_pump_power_kw=1.0, heater_power_kw=1.0)
+        is None
+    )
+    assert (
+        system_cop(heat_pump_cop=3.0, heat_pump_power_kw=-1.0, heater_power_kw=1.0)
+        is None
+    )
+    assert (
+        system_cop(
+            heat_pump_cop=float("nan"), heat_pump_power_kw=1.0, heater_power_kw=1.0
+        )
+        is None
+    )

@@ -21,6 +21,8 @@ from custom_components.thermal_storage_optimizer.const import (
     CONF_RETURN_TEMPERATURE,
     CONF_STOVE_CHARGING_PUMP,
     CONF_STOVE_FLOW_TEMPERATURE,
+    CONF_SUPPLEMENTARY_HEATER_POWER,
+    CONF_SUPPLEMENTARY_HEATER_SHARE,
     CONF_SUPPLY_TARGET,
     CONF_TANK_BOTTOM,
     CONF_TANK_MIDDLE,
@@ -50,6 +52,8 @@ OPTIONAL_CONFIG: dict[str, str] = {
     CONF_STOVE_CHARGING_PUMP: "binary_sensor.stove_charging_pump",
     CONF_STOVE_FLOW_TEMPERATURE: "sensor.stove_flow_temperature",
     CONF_FLOW_RATE: "sensor.tank_flow_rate",
+    CONF_SUPPLEMENTARY_HEATER_POWER: "sensor.heater_power",
+    CONF_SUPPLEMENTARY_HEATER_SHARE: "sensor.heater_share",
     CONF_NOTIFICATION_TARGET: "notify.mobile_app",
 }
 

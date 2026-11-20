@@ -24,7 +24,9 @@
           "stove_charging_pump_entity": "Kaminens laddpump (valfri)",
           "stove_flow_temperature_entity": "Kaminens framledningstemperatur (valfri)",
           "flow_rate_entity": "Tank-/radiatorflöde (valfritt)",
-          "notification_target_entity": "Aviseringsmål (valfritt)"
+          "notification_target_entity": "Aviseringsmål (valfritt)",
+          "supplementary_heater_power_entity": "Elpatronens eleffekt (valfri)",
+          "supplementary_heater_share_entity": "Tillsatsens utstyrning i procent (valfri)"
         }
       },
       "reconfigure": {
@@ -49,7 +51,9 @@
           "stove_charging_pump_entity": "Kaminens laddpump (valfri)",
           "stove_flow_temperature_entity": "Kaminens framledningstemperatur (valfri)",
           "flow_rate_entity": "Tank-/radiatorflöde (valfritt)",
-          "notification_target_entity": "Aviseringsmål (valfritt)"
+          "notification_target_entity": "Aviseringsmål (valfritt)",
+          "supplementary_heater_power_entity": "Elpatronens eleffekt (valfri)",
+          "supplementary_heater_share_entity": "Tillsatsens utstyrning i procent (valfri)"
         }
       }
     },
@@ -128,7 +132,8 @@
           "replan_interval_minutes": "Planning interval (minutes)",
           "temperature_curves_enabled": "Lär in temperaturberoende kurvor (värmekurva och COP)",
           "curve_bin_width_c": "Binbredd för inlärda kurvor (°C ute)",
-          "curve_min_confidence": "Lägsta konfidens för inlärda kurvor"
+          "curve_min_confidence": "Lägsta konfidens för inlärda kurvor",
+          "supplementary_heater_rated_power_kw": "Elpatronens nominella effekt (används med procententiteten)"
         },
         "data_description": {
           "sensor_stale_after": "Högsta ålder för temperaturer och valfria mätvärden.",
@@ -300,6 +305,9 @@
       },
       "estimated_net_saving": {
         "name": "Beräknad nettobesparing"
+      },
+      "supplementary_heat_share": {
+        "name": "Elpatronens andel av värmen"
       }
     },
     "binary_sensor": {

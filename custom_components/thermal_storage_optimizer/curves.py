@@ -34,6 +34,8 @@ MIN_POPULATED_BINS: Final = 2
 DEFAULT_BIN_WIDTH_C: Final = 3.0
 CARNOT_EFFICIENCY_LIMITS: Final = (0.1, 1.0)
 MIN_CARNOT_SAMPLES: Final = 6
+HEATER_SHARE_LIMITS: Final = (0.0, 1.0)
+BALANCE_POINT_SHARE: Final = 0.05
 _EXTRAPOLATION_CONFIDENCE_FACTOR: Final = 0.8
 _HEAT_PUMP_RUNNING_KW: Final = 0.1
 _OUTDOOR_LIMITS_C: Final = (-60.0, 60.0)
@@ -310,6 +312,12 @@ class TemperatureCurveSet:
             bin_width_c=config.bin_width_c,
             value_bounds=ParameterBounds(*CARNOT_EFFICIENCY_LIMITS),
         )
+        self.heater_share_curve = OutdoorBinnedCurve(
+            name="supplementary_heat_share",
+            unit="fraction of delivered heat",
+            bin_width_c=config.bin_width_c,
+            value_bounds=ParameterBounds(*HEATER_SHARE_LIMITS),
+        )
         self.revision = 0
 
     @property
@@ -317,7 +325,12 @@ class TemperatureCurveSet:
         """Return every learned curve by name."""
         return {
             curve.name: curve
-            for curve in (self.heating_curve, self.cop_curve, self.carnot_curve)
+            for curve in (
+                self.heating_curve,
+                self.cop_curve,
+                self.carnot_curve,
+                self.heater_share_curve,
+            )
         }
 
     def observe(
@@ -328,17 +341,24 @@ class TemperatureCurveSet:
         supply_target_c: float | None,
         measured_cop: float | None = None,
         heat_pump_power_kw: float | None = None,
+        heater_heat_share: float | None = None,
     ) -> bool:
         """Record one refresh; return whether any curve accepted a sample.
 
         A measured COP is sampled only while the heat pump is known to run or
-        when no electrical-power entity is configured to tell.
+        when no electrical-power entity is configured to tell. The measured COP
+        should already include any supplementary heater when its share is known.
         """
         if not self.config.enabled or outdoor_c is None:
             return False
         accepted = False
         if supply_target_c is not None:
             accepted = self.heating_curve.add_sample(now, outdoor_c, supply_target_c)
+        if heater_heat_share is not None:
+            accepted = (
+                self.heater_share_curve.add_sample(now, outdoor_c, heater_heat_share)
+                or accepted
+            )
         running = heat_pump_power_kw is None or heat_pump_power_kw > (
             _HEAT_PUMP_RUNNING_KW
         )
@@ -395,6 +415,25 @@ class TemperatureCurveSet:
         """Return whether any learned curve currently affects planning."""
         return self.heating_curve_usable(now) or self.cop_curve_usable(now)
 
+    def balance_point_c(self, now: datetime) -> float | None:
+        """Return the warmest learned bin where the supplementary heater still runs.
+
+        The balance point is the upper edge of the warmest bin whose median
+        heater share exceeds ``BALANCE_POINT_SHARE``; None when the heater has
+        not been seen running in any confident bin.
+        """
+        if not self.config.enabled:
+            return None
+        active = [
+            item
+            for item in self.heater_share_curve.summaries(now)
+            if item.confidence >= self.config.minimum_confidence
+            and item.median > BALANCE_POINT_SHARE
+        ]
+        if not active:
+            return None
+        return max(item.center_c for item in active) + self.config.bin_width_c / 2
+
     def supply_temperature_for(
         self, outdoor_c: float, *, now: datetime, fallback_c: float
     ) -> float:
@@ -449,6 +488,7 @@ class TemperatureCurveSet:
         return {
             "enabled": self.config.enabled,
             "minimum_confidence": self.config.minimum_confidence,
+            "balance_point_c": self.balance_point_c(now),
             "curves": {
                 name: curve.diagnostics(now, self.config.minimum_confidence)
                 for name, curve in self.curves.items()

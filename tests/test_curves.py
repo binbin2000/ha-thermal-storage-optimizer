@@ -252,10 +252,44 @@ def test_cop_curve_learns_only_while_running_and_extrapolates_with_carnot() -> N
         inside.value
     )
     payload = curves.serialize()
-    assert set(payload["curves"]) == {"heating_curve", "cop_curve", "carnot_efficiency"}
+    assert set(payload["curves"]) == {
+        "heating_curve",
+        "cop_curve",
+        "carnot_efficiency",
+        "supplementary_heat_share",
+    }
     restored = TemperatureCurveSet(config)
     assert restored.restore(payload, now=later)
     assert restored.cop_curve_usable(later)
     diagnostics = restored.diagnostics(later)["curves"]
     assert diagnostics["cop_curve"]["usable"]
     assert len(diagnostics["carnot_efficiency"]["bins"]) >= 1
+
+
+def test_heater_share_curve_reports_balance_point() -> None:
+    """The warmest bin where the heater still runs sets the learned balance point."""
+    config = CurveConfig(
+        enabled=True,
+        bin_width_c=3.0,
+        minimum_confidence=0.6,
+        supply_bounds=ParameterBounds(10, 90),
+        cop_bounds=ParameterBounds(1, 7),
+    )
+    curves = TemperatureCurveSet(config)
+    assert curves.balance_point_c(NOW) is None
+    for index in range(24):
+        outdoor, share = ((4.0, 0.0), (-5.0, 0.02), (-11.0, 0.35))[index % 3]
+        curves.observe(
+            now=NOW + index * MIN_BIN_SAMPLE_INTERVAL,
+            outdoor_c=outdoor,
+            supply_target_c=None,
+            heater_heat_share=share,
+        )
+    later = NOW + timedelta(hours=12)
+    assert curves.balance_point_c(later) == pytest.approx(-9.0)
+    diagnostics = curves.diagnostics(later)
+    assert diagnostics["balance_point_c"] == pytest.approx(-9.0)
+    assert len(diagnostics["curves"]["supplementary_heat_share"]["bins"]) == 3
+    assert not curves.observe(
+        now=later, outdoor_c=0.0, supply_target_c=None, heater_heat_share=1.5
+    )

@@ -24,7 +24,9 @@
           "stove_charging_pump_entity": "Stove charging pump (optional)",
           "stove_flow_temperature_entity": "Stove flow temperature (optional)",
           "flow_rate_entity": "Tank/radiator flow rate (optional)",
-          "notification_target_entity": "Notification target (optional)"
+          "notification_target_entity": "Notification target (optional)",
+          "supplementary_heater_power_entity": "Supplementary electric heater electrical power (optional)",
+          "supplementary_heater_share_entity": "Supplementary electric heater output share, % (optional)"
         }
       },
       "reconfigure": {
@@ -49,7 +51,9 @@
           "stove_charging_pump_entity": "Stove charging pump (optional)",
           "stove_flow_temperature_entity": "Stove flow temperature (optional)",
           "flow_rate_entity": "Tank/radiator flow rate (optional)",
-          "notification_target_entity": "Notification target (optional)"
+          "notification_target_entity": "Notification target (optional)",
+          "supplementary_heater_power_entity": "Supplementary electric heater electrical power (optional)",
+          "supplementary_heater_share_entity": "Supplementary electric heater output share, % (optional)"
         }
       }
     },
@@ -128,7 +132,8 @@
           "replan_interval_minutes": "Planning interval (minutes)",
           "temperature_curves_enabled": "Learn temperature-dependent curves (heating curve and COP)",
           "curve_bin_width_c": "Learned curve bin width (°C outdoor)",
-          "curve_min_confidence": "Minimum learned curve confidence"
+          "curve_min_confidence": "Minimum learned curve confidence",
+          "supplementary_heater_rated_power_kw": "Supplementary heater rated power (used with the share entity)"
         },
         "data_description": {
           "sensor_stale_after": "Maximum age for temperature and optional measurement updates.",
@@ -300,6 +305,9 @@
       },
       "estimated_net_saving": {
         "name": "Estimated net saving"
+      },
+      "supplementary_heat_share": {
+        "name": "Supplementary heater heat share"
       }
     },
     "binary_sensor": {

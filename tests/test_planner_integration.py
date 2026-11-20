@@ -12,7 +12,9 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.thermal_storage_optimizer.const import (
+    CONF_HEAT_PUMP_ELECTRICAL_POWER,
     CONF_MEASURED_COP,
+    CONF_SUPPLEMENTARY_HEATER_POWER,
     CONF_TEMPERATURE_CURVES,
     CONF_WEATHER,
     DOMAIN,
@@ -492,3 +494,43 @@ async def test_learned_cop_curve_drives_per_interval_cop_and_current_source(
     assert _state(hass, source_id).state == "learned_curve"
     assert coordinator.data.cop is not None
     assert coordinator.data.cop.value == pytest.approx(3.4, abs=0.05)
+
+
+async def test_supplementary_heater_lowers_effective_cop(hass: HomeAssistant) -> None:
+    """Separate heater and heat-pump power meters yield a system COP and share."""
+    set_valid_required_states(hass)
+    hass.states.async_set("sensor.measured_cop", "3.0")
+    hass.states.async_set("sensor.hp_power", "2000", {"unit_of_measurement": "W"})
+    hass.states.async_set("sensor.heater_power", "3", {"unit_of_measurement": "kW"})
+    hass.services.async_register("switch", "turn_on", AsyncMock())
+    hass.services.async_register("switch", "turn_off", AsyncMock())
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=INTEGRATION_NAME,
+        unique_id=UNIQUE_ID,
+        data={
+            **REQUIRED_CONFIG,
+            CONF_MEASURED_COP: "sensor.measured_cop",
+            CONF_HEAT_PUMP_ELECTRICAL_POWER: "sensor.hp_power",
+            CONF_SUPPLEMENTARY_HEATER_POWER: "sensor.heater_power",
+        },
+        version=3,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    data = entry.runtime_data.data
+    assert data.cop is not None
+    assert data.cop.value == pytest.approx(9 / 5)
+    assert data.cop.source.value == "measured"
+    assert data.supplementary_heat_share == pytest.approx(1 / 3)
+    assert all(item.forecast.cop == pytest.approx(1.8) for item in data.plan.intervals)
+    share_id = _entity_id(hass, "sensor", f"{entry.entry_id}_supplementary_heat_share")
+    assert float(_state(hass, share_id).state) == pytest.approx(100 / 3, abs=0.01)
+
+    hass.states.async_set("sensor.heater_power", "0", {"unit_of_measurement": "kW"})
+    await hass.async_block_till_done()
+    data = entry.runtime_data.data
+    assert data.cop is not None
+    assert data.cop.value == 3.0
+    assert data.supplementary_heat_share == 0

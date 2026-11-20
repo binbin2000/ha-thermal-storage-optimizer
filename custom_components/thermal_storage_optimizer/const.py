@@ -31,6 +31,8 @@ CONF_MEASURED_COP: Final = "measured_cop_entity"
 CONF_STOVE_CHARGING_PUMP: Final = "stove_charging_pump_entity"
 CONF_STOVE_FLOW_TEMPERATURE: Final = "stove_flow_temperature_entity"
 CONF_FLOW_RATE: Final = "flow_rate_entity"
+CONF_SUPPLEMENTARY_HEATER_POWER: Final = "supplementary_heater_power_entity"
+CONF_SUPPLEMENTARY_HEATER_SHARE: Final = "supplementary_heater_share_entity"
 CONF_NOTIFICATION_TARGET: Final = "notification_target_entity"
 
 CONF_SENSOR_STALE_AFTER: Final = "sensor_stale_after"
@@ -192,6 +194,8 @@ OPTIONAL_ENTITY_KEYS: Final = (
     CONF_STOVE_CHARGING_PUMP,
     CONF_STOVE_FLOW_TEMPERATURE,
     CONF_FLOW_RATE,
+    CONF_SUPPLEMENTARY_HEATER_POWER,
+    CONF_SUPPLEMENTARY_HEATER_SHARE,
     CONF_NOTIFICATION_TARGET,
 )
 
@@ -205,3 +209,5 @@ DEFAULT_TEMPERATURE_CURVES: Final = False
 DEFAULT_CURVE_BIN_WIDTH: Final = 3.0
 DEFAULT_CURVE_MIN_CONFIDENCE: Final = 0.6
 SUPPLY_TEMPERATURE_LIMITS_C: Final = (10.0, 90.0)
+CONF_SUPPLEMENTARY_HEATER_RATED_POWER: Final = "supplementary_heater_rated_power_kw"
+DEFAULT_SUPPLEMENTARY_HEATER_RATED_POWER: Final = 9.0

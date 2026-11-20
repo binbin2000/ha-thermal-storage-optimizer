@@ -49,6 +49,8 @@ make the required input set invalid.
 | Stove charging pump | `binary_sensor`, `switch`, or `input_boolean` | One possible signal that a manual stove-firing session is active. |
 | Stove flow temperature | Temperature sensor | Detects firing when it exceeds the configured stove threshold. |
 | Tank/radiator flow rate | Volume-flow-rate sensor | Optional flow measurement for diagnostics. |
+| Supplementary electric heater electrical power | Power sensor | Electrical power of the heat pump's supplementary (immersion) heater. Together with the heat-pump electrical power and measured COP it gives the system's effective COP, where the heater's share of heat is delivered at COP 1, and the heater's heat share shown by the **Supplementary heater heat share** diagnostic. |
+| Supplementary electric heater output share | Sensor in `%` | Alternative to the heater power entity, for controllers that expose the additional-heat output as a percentage (for example Rego via Husdata). Heater power is the share times the configured rated power. |
 | Notification target | `notify` entity | Delivers charging-advisor recommendations and progress. Supported mobile-app targets may also show acknowledge, snooze, and dismiss actions. |
 
 An invalid optional measurement is reported in diagnostics but does not invalidate the
@@ -79,6 +81,7 @@ required input set.
 | Learn temperature-dependent curves | Off | On/off | Learns the heat pump's heating curve (supply target versus outdoor temperature) and, when a measured-COP entity is configured, COP versus outdoor temperature. When enough confident bins exist, each forecast interval uses the learned supply target and COP for its own outdoor temperature; outside the learned COP range a learned Carnot efficiency extrapolates, and the fixed or calibrated COP remains the last fallback. Off keeps today's behaviour: the current supply target and current measured COP are repeated across the horizon. |
 | Learned curve bin width | 3 °C | 1–10 °C | Outdoor-temperature width of each learned bin. Narrower bins resolve a kinked curve better but need more samples. |
 | Minimum learned curve confidence | 0.6 | 0.3–1 | Confidence a bin needs before it is used. Confidence grows with sample count (full at twice the six-sample minimum) and shrinks with spread inside the bin. |
+| Supplementary heater rated power | 9 kW | 0.1–50 kW | Rated electrical power multiplied by the heater output share when no heater power entity is configured. |
 
 The next-hour demand model is `heat-loss coefficient × max(balance temperature −
 outdoor temperature, 0)`. Tank energy is calculated from the configured effective

@@ -84,6 +84,9 @@ from .const import (
     CONF_STOVE_EFFICIENCY,
     CONF_STOVE_FLOW_TEMPERATURE,
     CONF_STOVE_TEMPERATURE_THRESHOLD,
+    CONF_SUPPLEMENTARY_HEATER_POWER,
+    CONF_SUPPLEMENTARY_HEATER_RATED_POWER,
+    CONF_SUPPLEMENTARY_HEATER_SHARE,
     CONF_SUPPLY_TARGET,
     CONF_TANK_BOTTOM,
     CONF_TANK_MIDDLE,
@@ -187,6 +190,12 @@ ENTITY_SCHEMA = vol.Schema(
         vol.Optional(CONF_STOVE_FLOW_TEMPERATURE): TEMPERATURE_SELECTOR,
         vol.Optional(CONF_FLOW_RATE): _entity_selector(
             domain="sensor", device_class=SensorDeviceClass.VOLUME_FLOW_RATE
+        ),
+        vol.Optional(CONF_SUPPLEMENTARY_HEATER_POWER): _entity_selector(
+            domain="sensor", device_class=SensorDeviceClass.POWER
+        ),
+        vol.Optional(CONF_SUPPLEMENTARY_HEATER_SHARE): _entity_selector(
+            domain="sensor"
         ),
         vol.Optional(CONF_NOTIFICATION_TARGET): _entity_selector(domain="notify"),
     }
@@ -407,6 +416,9 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Required(
             CONF_CURVE_MIN_CONFIDENCE, default=DEFAULT_CURVE_MIN_CONFIDENCE
         ): _number_selector(0.3, 1, 0.01),
+        vol.Optional(CONF_SUPPLEMENTARY_HEATER_RATED_POWER): _number_selector(
+            0.1, 50, 0.1, "kW"
+        ),
         vol.Required(
             CONF_ACTIVE_CONTROL, default=DEFAULT_ACTIVE_CONTROL
         ): selector.BooleanSelector(),

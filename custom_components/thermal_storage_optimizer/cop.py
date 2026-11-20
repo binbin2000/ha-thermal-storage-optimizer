@@ -167,6 +167,36 @@ def carnot_efficiency(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class SystemCop:
+    """Effective COP of heat pump plus supplementary electric heater together."""
+
+    value: float
+    heater_heat_share: float
+
+
+def system_cop(
+    *,
+    heat_pump_cop: float,
+    heat_pump_power_kw: float,
+    heater_power_kw: float,
+) -> SystemCop | None:
+    """Combine compressor COP with a resistive heater that delivers heat at COP 1.
+
+    Returns None when nothing is running or an input is not physically valid.
+    """
+    values = (heat_pump_cop, heat_pump_power_kw, heater_power_kw)
+    if not all(math.isfinite(value) for value in values):
+        return None
+    if heat_pump_cop <= 0 or heat_pump_power_kw < 0 or heater_power_kw < 0:
+        return None
+    electrical = heat_pump_power_kw + heater_power_kw
+    if electrical <= 0:
+        return None
+    heat = heat_pump_power_kw * heat_pump_cop + heater_power_kw
+    return SystemCop(heat / electrical, heater_power_kw / heat)
+
+
 def estimate_cop(
     model: CopModel,
     *,

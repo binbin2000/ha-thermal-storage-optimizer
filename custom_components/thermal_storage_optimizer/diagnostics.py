@@ -80,6 +80,7 @@ async def async_get_config_entry_diagnostics(
             "cop": cop.value if cop is not None else None,
             "cop_source": cop.source.value if cop is not None else None,
             "cop_confidence": cop.confidence if cop is not None else None,
+            "supplementary_heat_share": data.supplementary_heat_share,
         },
         "outdoor_forecast": {
             "configured": coordinator.adapter.weather_entity_id is not None,
