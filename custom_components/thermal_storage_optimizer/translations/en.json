@@ -126,7 +126,7 @@
           "wood_energy_content_kwh_per_kg": "Wood energy content (optional)",
           "stove_to_tank_efficiency": "Stove-to-tank efficiency (optional)",
           "replan_interval_minutes": "Planning interval (minutes)",
-          "temperature_curves_enabled": "Learn temperature-dependent curves (heating curve)",
+          "temperature_curves_enabled": "Learn temperature-dependent curves (heating curve and COP)",
           "curve_bin_width_c": "Learned curve bin width (°C outdoor)",
           "curve_min_confidence": "Minimum learned curve confidence"
         },
@@ -220,6 +220,8 @@
         "name": "COP source",
         "state": {
           "measured": "Measured",
+          "learned_curve": "Learned curve",
+          "carnot_extrapolation": "Carnot extrapolation",
           "calibrated": "Calibrated",
           "fixed_fallback": "Fixed fallback"
         }

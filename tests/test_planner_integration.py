@@ -3,6 +3,7 @@
 from datetime import timedelta
 from unittest.mock import AsyncMock
 
+import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.const import STATE_OFF
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
@@ -11,6 +12,7 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.thermal_storage_optimizer.const import (
+    CONF_MEASURED_COP,
     CONF_TEMPERATURE_CURVES,
     CONF_WEATHER,
     DOMAIN,
@@ -395,3 +397,98 @@ async def test_learned_heating_curve_sets_interval_supply_targets(
     )
     assert "heating_curve" in response["reset_items"]
     assert _state(hass, curve_id).state == "learning"
+
+
+async def test_learned_cop_curve_drives_per_interval_cop_and_current_source(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A measured COP sensor teaches per-bin COP used per interval and as fallback."""
+    set_valid_required_states(hass)
+    hass.states.async_set("sensor.measured_cop", "3.4")
+    hass.states.async_set("weather.home", "cloudy", {"temperature_unit": "°C"})
+    start = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+
+    async def get_forecasts(_call: ServiceCall) -> dict[str, object]:
+        now = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+        return {
+            "weather.home": {
+                "forecast": [
+                    {
+                        "datetime": (now + timedelta(hours=index)).isoformat(),
+                        "temperature": 5 - 2 * index,
+                    }
+                    for index in range(12)
+                ]
+            }
+        }
+
+    hass.services.async_register(
+        "weather",
+        "get_forecasts",
+        AsyncMock(side_effect=get_forecasts),
+        supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register("switch", "turn_on", AsyncMock())
+    hass.services.async_register("switch", "turn_off", AsyncMock())
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=INTEGRATION_NAME,
+        unique_id=UNIQUE_ID,
+        data={
+            **REQUIRED_CONFIG,
+            CONF_MEASURED_COP: "sensor.measured_cop",
+            CONF_WEATHER: "weather.home",
+        },
+        options={CONF_TEMPERATURE_CURVES: True},
+        version=3,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data
+    source_id = _entity_id(hass, "sensor", f"{entry.entry_id}_cop_source")
+    assert _state(hass, source_id).state == "measured"
+    assert {item.forecast.cop for item in coordinator.data.plan.intervals} == {3.4}
+    del start
+
+    # End on the mild bin so the measured 5 °C matches the forecast start and
+    # no bias correction distorts the per-interval temperatures.
+    for index in range(19):
+        outdoor, cop = ((5.0, 3.4), (-1.0, 2.9), (-7.0, 2.3))[index % 3]
+        freezer.tick(timedelta(minutes=31))
+        _publish_prices(hass)
+        for entity_id, value in (
+            ("sensor.tank_top", "60"),
+            ("sensor.tank_middle", "50"),
+            ("sensor.tank_bottom", "40"),
+            ("sensor.return_temperature", "30"),
+            ("sensor.supply_target", "45"),
+        ):
+            hass.states.async_set(
+                entity_id, value, {"unit_of_measurement": "°C"}, force_update=True
+            )
+        hass.states.async_set("sensor.measured_cop", str(cop))
+        hass.states.async_set(
+            "sensor.outdoor_temperature", str(outdoor), {"unit_of_measurement": "°C"}
+        )
+        await hass.async_block_till_done()
+    assert coordinator.curves.cop_curve_usable(coordinator.data.captured_at)
+    # A weather-entity update refreshes the hourly forecast from the current hour.
+    hass.states.async_set("weather.home", "rainy", {"temperature_unit": "°C"})
+    await hass.async_block_till_done()
+    plan = coordinator.data.plan
+    assert plan is not None
+    temperatures = [item.forecast.outdoor_temperature_c for item in plan.intervals]
+    assert temperatures[0] > temperatures[-1]
+    cops = [item.forecast.cop for item in plan.intervals]
+    # The forecast cools over the horizon, so the per-interval COP must fall.
+    assert cops == sorted(cops, reverse=True)
+    assert cops[0] > cops[-1]
+    assert _state(hass, source_id).state == "measured"
+
+    hass.states.async_set("sensor.measured_cop", "unavailable")
+    await hass.async_block_till_done()
+    assert _state(hass, source_id).state == "learned_curve"
+    assert coordinator.data.cop is not None
+    assert coordinator.data.cop.value == pytest.approx(3.4, abs=0.05)

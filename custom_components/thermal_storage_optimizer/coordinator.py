@@ -49,6 +49,7 @@ from .const import (
     CONF_HEAT_LOSS_MAX,
     CONF_HEAT_LOSS_MIN,
     CONF_HEAT_PUMP_ELECTRICAL_ENERGY,
+    CONF_HEAT_PUMP_ELECTRICAL_POWER,
     CONF_HEAT_PUMP_PRODUCED_HEAT,
     CONF_HOURLY_RETENTION,
     CONF_INITIAL_CHARGING_POWER,
@@ -272,6 +273,10 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                     options, CONF_CURVE_MIN_CONFIDENCE, DEFAULT_CURVE_MIN_CONFIDENCE
                 ),
                 supply_bounds=ParameterBounds(*SUPPLY_TEMPERATURE_LIMITS_C),
+                cop_bounds=ParameterBounds(
+                    _option(options, CONF_COP_MIN, DEFAULT_COP_MIN),
+                    _option(options, CONF_COP_MAX, DEFAULT_COP_MAX),
+                ),
             )
         )
         self._prices: PriceForecast | None = None
@@ -467,10 +472,13 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
         )
         outdoor = _numeric_value(inputs, CONF_OUTDOOR_TEMPERATURE)
         supply_target = _numeric_value(inputs, CONF_SUPPLY_TARGET)
+        measured_cop = _numeric_value(inputs, CONF_MEASURED_COP)
         if self.curves.observe(
             now=inputs.captured_at,
             outdoor_c=outdoor,
             supply_target_c=supply_target,
+            measured_cop=measured_cop,
+            heat_pump_power_kw=_numeric_value(inputs, CONF_HEAT_PUMP_ELECTRICAL_POWER),
         ):
             # Samples are accepted at most once per bin per 30 minutes, so an
             # immediate save stays infrequent and survives reload without a flush.
@@ -485,16 +493,15 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                 outdoor, timedelta(hours=1), effective_demand_config
             )
         if outdoor is not None and supply_target is not None:
+            # Current COP: measurement, learned curve, calibrated scalar, fixed.
             cop = estimate_cop(
-                effective_cop_model,
+                self.curves.cop_model(inputs.captured_at, effective_cop_model),
                 outdoor_temperature_c=outdoor,
                 supply_temperature_c=supply_target,
-                measured_cop=_numeric_value(inputs, CONF_MEASURED_COP),
+                measured_cop=measured_cop,
             )
             calibrated_cop = self.calibration.parameters["cop"]
-            if _numeric_value(
-                inputs, CONF_MEASURED_COP
-            ) is None and calibrated_cop.usable(
+            if cop.source is CopSource.FIXED_FALLBACK and calibrated_cop.usable(
                 self.calibration.config.minimum_confidence
             ):
                 cop = CopEstimate(
@@ -506,7 +513,7 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             thermal.confidence,
             outdoor,
             supply_target,
-            _numeric_value(inputs, CONF_MEASURED_COP),
+            measured_cop,
             cop.confidence if cop is not None else 0.0,
             demand_config=effective_demand_config,
             cop_model=effective_cop_model,
@@ -635,6 +642,10 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                 rejected,
             )
         outdoor_forecast = self._adapter.outdoor_forecast
+        if self.curves.cop_curve_usable(now):
+            # The learned curve already contains the measurement; use it per
+            # interval instead of repeating the current reading across the horizon.
+            measured_cop = None
         planning_inputs = (
             available_energy_kwh,
             outdoor_temperature_c,
@@ -646,7 +657,7 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             cop_model,
             outdoor_forecast,
             # Only a usable curve changes the plan; learning alone must not churn it.
-            self.curves.revision if self.curves.heating_curve_usable(now) else None,
+            self.curves.revision if self.curves.any_usable(now) else None,
         )
         if (
             not self._force_recalculation
@@ -693,7 +704,7 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             outdoor_temperature_c=float(outdoor_temperature_c),
             supply_temperature_c=float(supply_temperature_c),
             measured_cop=measured_cop,
-            cop_model=cop_model,
+            cop_model=self.curves.cop_model(now, cop_model),
             demand_config=demand_config,
             model_config=model_config,
             outdoor_forecast=outdoor_forecast,

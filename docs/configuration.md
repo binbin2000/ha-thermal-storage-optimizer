@@ -45,7 +45,7 @@ make the required input set invalid.
 | Heat-pump electrical power | Power sensor | Instantaneous heat-pump electrical consumption for diagnostics and calibration evidence. |
 | Heat-pump electrical energy | Energy sensor | Cumulative electrical energy; pair with produced heat energy for adaptive COP calibration. |
 | Heat-pump produced heat energy | Energy sensor | Cumulative delivered heat used by adaptive calibration and validation. |
-| Measured COP | Sensor | Preferred COP when its state is valid; otherwise the fixed or calibrated fallback is used. |
+| Measured COP | Sensor | Preferred current COP when its state is valid. With curve learning enabled it also teaches COP per outdoor-temperature bin, sampled only while the heat-pump electrical power (if configured) is above 0.1 kW. Otherwise the learned curve, calibrated, or fixed fallback is used. |
 | Stove charging pump | `binary_sensor`, `switch`, or `input_boolean` | One possible signal that a manual stove-firing session is active. |
 | Stove flow temperature | Temperature sensor | Detects firing when it exceeds the configured stove threshold. |
 | Tank/radiator flow rate | Volume-flow-rate sensor | Optional flow measurement for diagnostics. |
@@ -76,7 +76,7 @@ required input set.
 | Forecast confidence | 0.85 | 0–1 | Conservative discount applied to forecast value. |
 | Economic deadband | 0.05 currency/kWh heat | 0–100 | Minimum advantage over the horizon baseline before tank energy is allocated. |
 | Planning interval | 15 min | 1–60 min | Periodic plan refresh interval; relevant state changes can also trigger a refresh. |
-| Learn temperature-dependent curves | Off | On/off | Learns the heat pump's heating curve (supply target versus outdoor temperature) from the configured supply-target and outdoor entities. When enough confident bins exist, each forecast interval uses the learned supply target for its own outdoor temperature. Off keeps the current supply target for every interval. |
+| Learn temperature-dependent curves | Off | On/off | Learns the heat pump's heating curve (supply target versus outdoor temperature) and, when a measured-COP entity is configured, COP versus outdoor temperature. When enough confident bins exist, each forecast interval uses the learned supply target and COP for its own outdoor temperature; outside the learned COP range a learned Carnot efficiency extrapolates, and the fixed or calibrated COP remains the last fallback. Off keeps today's behaviour: the current supply target and current measured COP are repeated across the horizon. |
 | Learned curve bin width | 3 °C | 1–10 °C | Outdoor-temperature width of each learned bin. Narrower bins resolve a kinked curve better but need more samples. |
 | Minimum learned curve confidence | 0.6 | 0.3–1 | Confidence a bin needs before it is used. Confidence grows with sample count (full at twice the six-sample minimum) and shrinks with spread inside the bin. |
 

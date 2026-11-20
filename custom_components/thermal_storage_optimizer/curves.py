@@ -18,8 +18,11 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final
 
+from .adaptive import ParameterBounds
+from .cop import LearnedCopModel, carnot_efficiency
+
 if TYPE_CHECKING:
-    from .adaptive import ParameterBounds
+    from .cop import CopModel
 
 CURVE_SCHEMA_VERSION: Final = 1
 MAX_SAMPLES_PER_BIN: Final = 48
@@ -29,7 +32,10 @@ MIN_BIN_SAMPLE_INTERVAL: Final = timedelta(minutes=30)
 MIN_BIN_SAMPLES: Final = 6
 MIN_POPULATED_BINS: Final = 2
 DEFAULT_BIN_WIDTH_C: Final = 3.0
+CARNOT_EFFICIENCY_LIMITS: Final = (0.1, 1.0)
+MIN_CARNOT_SAMPLES: Final = 6
 _EXTRAPOLATION_CONFIDENCE_FACTOR: Final = 0.8
+_HEAT_PUMP_RUNNING_KW: Final = 0.1
 _OUTDOOR_LIMITS_C: Final = (-60.0, 60.0)
 
 
@@ -146,6 +152,18 @@ class OutdoorBinnedCurve:
                 )
             )
         return tuple(result)
+
+    def overall_median(self, now: datetime) -> tuple[float, int] | None:
+        """Return the median and count of every retained sample across bins."""
+        values = [
+            s.value
+            for samples in self._bins.values()
+            for s in samples
+            if now - s.at <= self.max_age
+        ]
+        if not values:
+            return None
+        return statistics.median(values), len(values)
 
     def usable(self, now: datetime, minimum_confidence: float) -> bool:
         """Return whether enough confident bins exist to describe a curve."""
@@ -265,6 +283,7 @@ class CurveConfig:
     bin_width_c: float
     minimum_confidence: float
     supply_bounds: ParameterBounds
+    cop_bounds: ParameterBounds
 
 
 class TemperatureCurveSet:
@@ -279,12 +298,27 @@ class TemperatureCurveSet:
             bin_width_c=config.bin_width_c,
             value_bounds=config.supply_bounds,
         )
+        self.cop_curve = OutdoorBinnedCurve(
+            name="cop_curve",
+            unit="COP",
+            bin_width_c=config.bin_width_c,
+            value_bounds=config.cop_bounds,
+        )
+        self.carnot_curve = OutdoorBinnedCurve(
+            name="carnot_efficiency",
+            unit="fraction of ideal COP",
+            bin_width_c=config.bin_width_c,
+            value_bounds=ParameterBounds(*CARNOT_EFFICIENCY_LIMITS),
+        )
         self.revision = 0
 
     @property
     def curves(self) -> dict[str, OutdoorBinnedCurve]:
         """Return every learned curve by name."""
-        return {self.heating_curve.name: self.heating_curve}
+        return {
+            curve.name: curve
+            for curve in (self.heating_curve, self.cop_curve, self.carnot_curve)
+        }
 
     def observe(
         self,
@@ -292,17 +326,74 @@ class TemperatureCurveSet:
         now: datetime,
         outdoor_c: float | None,
         supply_target_c: float | None,
+        measured_cop: float | None = None,
+        heat_pump_power_kw: float | None = None,
     ) -> bool:
-        """Record one refresh; return whether any curve accepted a sample."""
+        """Record one refresh; return whether any curve accepted a sample.
+
+        A measured COP is sampled only while the heat pump is known to run or
+        when no electrical-power entity is configured to tell.
+        """
         if not self.config.enabled or outdoor_c is None:
             return False
         accepted = False
         if supply_target_c is not None:
             accepted = self.heating_curve.add_sample(now, outdoor_c, supply_target_c)
+        running = heat_pump_power_kw is None or heat_pump_power_kw > (
+            _HEAT_PUMP_RUNNING_KW
+        )
+        if measured_cop is not None and running:
+            accepted = self.cop_curve.add_sample(now, outdoor_c, measured_cop) or (
+                accepted
+            )
+            if supply_target_c is not None:
+                efficiency = carnot_efficiency(
+                    measured_cop=measured_cop,
+                    outdoor_temperature_c=outdoor_c,
+                    supply_temperature_c=supply_target_c,
+                )
+                if efficiency is not None:
+                    accepted = (
+                        self.carnot_curve.add_sample(now, outdoor_c, efficiency)
+                        or accepted
+                    )
         if accepted:
             self.revision += 1
-            self.heating_curve.prune(now)
+            for curve in self.curves.values():
+                curve.prune(now)
         return accepted
+
+    def carnot_efficiency(self, now: datetime) -> float | None:
+        """Return the robust learned fraction of ideal COP when identifiable."""
+        if not self.config.enabled:
+            return None
+        summary = self.carnot_curve.overall_median(now)
+        if summary is None or summary[1] < MIN_CARNOT_SAMPLES:
+            return None
+        return summary[0]
+
+    def cop_curve_usable(self, now: datetime) -> bool:
+        """Return whether learned COP bins replace the configured model."""
+        return self.config.enabled and self.cop_curve.usable(
+            now, self.config.minimum_confidence
+        )
+
+    def cop_model(self, now: datetime, fallback: CopModel) -> CopModel:
+        """Return the learned COP model when usable, else the fallback itself."""
+        if not self.cop_curve_usable(now):
+            return fallback
+        return LearnedCopModel(
+            self.cop_curve,
+            now,
+            self.config.minimum_confidence,
+            self.carnot_efficiency(now),
+            self.config.cop_bounds,
+            fallback,
+        )
+
+    def any_usable(self, now: datetime) -> bool:
+        """Return whether any learned curve currently affects planning."""
+        return self.heating_curve_usable(now) or self.cop_curve_usable(now)
 
     def supply_temperature_for(
         self, outdoor_c: float, *, now: datetime, fallback_c: float

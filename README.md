@@ -280,7 +280,10 @@ unavailable or older than 12 hours, the measured outdoor temperature is repeated
 across the horizon. With **Learn temperature-dependent curves** enabled, the
 heat pump's heating curve is learned from the supply-target and outdoor entities
 in bounded outdoor-temperature bins, and each interval's supply target follows
-its own outdoor temperature once enough confident bins exist. High-grade energy
+its own outdoor temperature once enough confident bins exist. A configured
+measured-COP entity additionally teaches COP per outdoor-temperature bin, so each
+interval's avoided heat cost reflects the colder hours' lower COP; a learned
+Carnot efficiency extrapolates below the observed range. High-grade energy
 remains diagnostic.
 
 Learned values fall back when required evidence disappears or becomes anomalous.

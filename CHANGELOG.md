@@ -17,6 +17,13 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
   configured entities and applied per forecast interval. Bins are bounded, aged
   out after 30 days, exposed on a new **Learned temperature curves** diagnostic
   entity, persisted across restarts, and cleared by the reset action.
+- Temperature-dependent COP learned from the measured-COP entity per
+  outdoor-temperature bin (sampled only while the heat pump runs when its
+  electrical power is configured). Each forecast interval uses the learned COP for
+  its own forecast outdoor temperature, a learned Carnot efficiency extrapolates
+  beyond the observed range, and the fixed or calibrated value remains the last
+  fallback. The COP source entity gains `learned_curve` and
+  `carnot_extrapolation` states.
 
 ## [1.0.0] - 2026-09-08
 

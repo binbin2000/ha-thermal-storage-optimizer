@@ -5,6 +5,11 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from custom_components.thermal_storage_optimizer.adaptive import ParameterBounds
+from custom_components.thermal_storage_optimizer.cop import (
+    CopSource,
+    FixedCopModel,
+    carnot_cop,
+)
 from custom_components.thermal_storage_optimizer.curves import (
     MAX_BINS,
     MAX_SAMPLE_AGE,
@@ -131,6 +136,7 @@ def test_curve_set_gates_on_enable_confidence_and_resets() -> None:
         bin_width_c=3.0,
         minimum_confidence=0.6,
         supply_bounds=ParameterBounds(10, 90),
+        cop_bounds=ParameterBounds(1, 7),
     )
     curves = TemperatureCurveSet(config)
     assert curves.supply_temperature_for(0.0, now=NOW, fallback_c=45) == 45
@@ -166,6 +172,7 @@ def test_curve_set_gates_on_enable_confidence_and_resets() -> None:
             bin_width_c=3.0,
             minimum_confidence=0.6,
             supply_bounds=ParameterBounds(10, 90),
+            cop_bounds=ParameterBounds(1, 7),
         )
     )
     assert not disabled.observe(now=NOW, outdoor_c=2.0, supply_target_c=40)
@@ -182,3 +189,73 @@ def test_curve_rejects_invalid_configuration(
     """Non-positive widths or sample minimums are configuration errors."""
     with pytest.raises(ValueError, match="positive"):
         _curve(bin_width_c=bin_width, min_bin_samples=min_bin_samples)
+
+
+def _cop_reference(outdoor_c: float) -> float:
+    """Return a reference air-to-water COP that collapses in cold weather."""
+    return max(1.6, min(4.2, 3.0 + 0.08 * outdoor_c))
+
+
+def test_cop_curve_learns_only_while_running_and_extrapolates_with_carnot() -> None:
+    """Measured COP fills bins when the pump runs; cold gaps use learned Carnot."""
+    config = CurveConfig(
+        enabled=True,
+        bin_width_c=3.0,
+        minimum_confidence=0.6,
+        supply_bounds=ParameterBounds(10, 90),
+        cop_bounds=ParameterBounds(1, 7),
+    )
+    curves = TemperatureCurveSet(config)
+    fallback = FixedCopModel(3.0)
+    assert curves.cop_model(NOW, fallback) is fallback
+    assert curves.carnot_efficiency(NOW) is None
+    idle = curves.observe(
+        now=NOW,
+        outdoor_c=2.0,
+        supply_target_c=None,
+        measured_cop=3.2,
+        heat_pump_power_kw=0.0,
+    )
+    assert not idle
+    assert curves.cop_curve.sample_count == 0
+    for index in range(24):
+        outdoor = (2.0, -4.0, 8.0)[index % 3]
+        at = NOW + index * MIN_BIN_SAMPLE_INTERVAL
+        curves.observe(
+            now=at,
+            outdoor_c=outdoor,
+            supply_target_c=_supply(outdoor),
+            measured_cop=_cop_reference(outdoor),
+            heat_pump_power_kw=1.4,
+        )
+    later = NOW + timedelta(hours=12)
+    assert curves.cop_curve_usable(later)
+    assert curves.any_usable(later)
+    efficiency = curves.carnot_efficiency(later)
+    assert efficiency is not None
+    assert 0.1 < efficiency < 1.0
+    model = curves.cop_model(later, fallback)
+    assert model is not fallback
+    inside = model.explain(outdoor_temperature_c=-4.0, supply_temperature_c=45)
+    between = model.explain(outdoor_temperature_c=-1.0, supply_temperature_c=45)
+    cold = model.explain(outdoor_temperature_c=-20.0, supply_temperature_c=55)
+    assert inside.source is CopSource.LEARNED_CURVE
+    assert inside.value == pytest.approx(_cop_reference(-4.0))
+    assert between.source is CopSource.LEARNED_CURVE
+    assert cold.source is CopSource.CARNOT_EXTRAPOLATION
+    assert cold.value == pytest.approx(
+        efficiency * carnot_cop(outdoor_temperature_c=-20.0, supply_temperature_c=55)
+    )
+    assert cold.value < inside.value
+    assert cold.confidence < inside.confidence
+    assert model.estimate(outdoor_temperature_c=-4.0, supply_temperature_c=45) == (
+        inside.value
+    )
+    payload = curves.serialize()
+    assert set(payload["curves"]) == {"heating_curve", "cop_curve", "carnot_efficiency"}
+    restored = TemperatureCurveSet(config)
+    assert restored.restore(payload, now=later)
+    assert restored.cop_curve_usable(later)
+    diagnostics = restored.diagnostics(later)["curves"]
+    assert diagnostics["cop_curve"]["usable"]
+    assert len(diagnostics["carnot_efficiency"]["bins"]) >= 1

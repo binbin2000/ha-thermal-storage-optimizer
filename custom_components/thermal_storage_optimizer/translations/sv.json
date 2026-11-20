@@ -126,7 +126,7 @@
           "wood_energy_content_kwh_per_kg": "Vedens energiinnehåll (valfritt)",
           "stove_to_tank_efficiency": "Verkningsgrad kamin till tank (valfri)",
           "replan_interval_minutes": "Planning interval (minutes)",
-          "temperature_curves_enabled": "Lär in temperaturberoende kurvor (värmekurva)",
+          "temperature_curves_enabled": "Lär in temperaturberoende kurvor (värmekurva och COP)",
           "curve_bin_width_c": "Binbredd för inlärda kurvor (°C ute)",
           "curve_min_confidence": "Lägsta konfidens för inlärda kurvor"
         },
@@ -220,6 +220,8 @@
         "name": "COP-källa",
         "state": {
           "measured": "Uppmätt",
+          "learned_curve": "Inlärd kurva",
+          "carnot_extrapolation": "Carnot-extrapolation",
           "calibrated": "Kalibrerad",
           "fixed_fallback": "Fast reservvärde"
         }

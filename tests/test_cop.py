@@ -1,12 +1,24 @@
 """Unit tests for the replaceable COP interface and fixed fallback."""
 
+from datetime import UTC, datetime
+
 import pytest
 
+from custom_components.thermal_storage_optimizer.adaptive import ParameterBounds
 from custom_components.thermal_storage_optimizer.cop import (
     CopSource,
     FixedCopModel,
+    LearnedCopModel,
+    carnot_cop,
+    carnot_efficiency,
     estimate_cop,
 )
+from custom_components.thermal_storage_optimizer.curves import (
+    MIN_BIN_SAMPLE_INTERVAL,
+    OutdoorBinnedCurve,
+)
+
+NOW = datetime(2026, 11, 20, 12, tzinfo=UTC)
 
 
 def test_fixed_cop_fallback_is_deterministic() -> None:
@@ -49,3 +61,71 @@ def test_invalid_measurement_uses_fixed_fallback(measured: float) -> None:
     )
     assert estimate.value == 3.0
     assert estimate.source is CopSource.FIXED_FALLBACK
+
+
+def test_carnot_helpers_are_physical_and_guard_small_lifts() -> None:
+    """Ideal COP falls with lift; efficiency is undefined without a real lift."""
+    mild = carnot_cop(outdoor_temperature_c=7.0, supply_temperature_c=35.0)
+    cold = carnot_cop(outdoor_temperature_c=-15.0, supply_temperature_c=50.0)
+    assert mild > cold > 1
+    assert carnot_efficiency(
+        measured_cop=mild / 2, outdoor_temperature_c=7.0, supply_temperature_c=35.0
+    ) == pytest.approx(0.5)
+    assert (
+        carnot_efficiency(
+            measured_cop=3.0, outdoor_temperature_c=34.5, supply_temperature_c=35.0
+        )
+        is None
+    )
+    assert (
+        carnot_efficiency(
+            measured_cop=0.0, outdoor_temperature_c=0.0, supply_temperature_c=35.0
+        )
+        is None
+    )
+    with pytest.raises(ValueError, match="finite"):
+        carnot_cop(outdoor_temperature_c=float("nan"), supply_temperature_c=35.0)
+
+
+def test_learned_model_falls_back_without_carnot_efficiency() -> None:
+    """Outside the learned range and without efficiency the fallback is explained."""
+    curve = OutdoorBinnedCurve(
+        name="cop_curve",
+        unit="COP",
+        bin_width_c=3.0,
+        value_bounds=ParameterBounds(1, 7),
+    )
+    for index in range(8):
+        for outdoor, value in ((1.0, 3.1), (7.0, 3.6)):
+            curve.add_sample(NOW + index * MIN_BIN_SAMPLE_INTERVAL, outdoor, value)
+    model = LearnedCopModel(
+        curve,
+        NOW + timedelta_hours(5),
+        0.6,
+        None,
+        ParameterBounds(1, 7),
+        FixedCopModel(2.5),
+    )
+    learned = model.explain(outdoor_temperature_c=1.0, supply_temperature_c=40)
+    outside = model.explain(outdoor_temperature_c=-10.0, supply_temperature_c=40)
+    assert learned.source is CopSource.LEARNED_CURVE
+    assert learned.value == pytest.approx(3.1)
+    assert outside.source is CopSource.FIXED_FALLBACK
+    assert outside.value == 2.5
+    assert (
+        estimate_cop(model, outdoor_temperature_c=-10.0, supply_temperature_c=40).source
+        is CopSource.FIXED_FALLBACK
+    )
+    assert (
+        estimate_cop(
+            model, outdoor_temperature_c=1.0, supply_temperature_c=40, measured_cop=3.9
+        ).source
+        is CopSource.MEASURED
+    )
+
+
+def timedelta_hours(hours: float):  # noqa: ANN201
+    """Return a timedelta in hours without another import line."""
+    from datetime import timedelta  # noqa: PLC0415
+
+    return timedelta(hours=hours)

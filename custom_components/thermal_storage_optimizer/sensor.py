@@ -32,6 +32,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .controller import OperatingState, SupervisoryController
 from .coordinator import InputCoordinator
+from .cop import CopSource
 from .data import IntegrationStatus, PlanStatus, RuntimeSnapshot
 from .energy import DataQuality, EnergyTrend
 from .price import forecast_coverage_hours
@@ -143,7 +144,7 @@ CALCULATED_SENSORS: tuple[CalculatedSensorDescription, ...] = (
         translation_key="cop_source",
         device_class=SensorDeviceClass.ENUM,
         entity_category=EntityCategory.DIAGNOSTIC,
-        options=["measured", "calibrated", "fixed_fallback"],
+        options=[source.value for source in CopSource],
         value_fn=lambda data: data.cop.source if data.cop is not None else None,
     ),
     CalculatedSensorDescription(
