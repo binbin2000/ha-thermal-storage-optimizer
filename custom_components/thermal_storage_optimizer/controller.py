@@ -120,7 +120,8 @@ class ControllerStateMachine:
         self.started_at = started_at
         self._forced_use_latched = False
         self._last_flow_request = False
-        self._last_flow_change = started_at
+        # No change has happened yet: startup grace, not dwell, guards start-up.
+        self._last_flow_change: datetime | None = None
 
     def evaluate(  # noqa: C901, PLR0911, PLR0912
         self, item: ControllerInput
@@ -220,11 +221,19 @@ class ControllerStateMachine:
                 now=item.now,
             )
 
-        elapsed = item.now - self._last_flow_change
+        # Dwell damps automatic switching only. An explicit manual selection is
+        # not chatter and applies at once; dwell is measured from the last real
+        # use/reserve change, so nothing is held before the first change.
+        elapsed = (
+            item.now - self._last_flow_change
+            if self._last_flow_change is not None
+            else self.config.minimum_dwell
+        )
         if (
-            reserve != self._last_flow_request
+            item.mode is UserMode.AUTO
+            and reserve != self._last_flow_request
             and elapsed < self.config.minimum_dwell
-            and not (item.mode is UserMode.AUTO and item.budget_exhausted)
+            and not item.budget_exhausted
         ):
             remaining = self.config.minimum_dwell - elapsed
             held_state = (

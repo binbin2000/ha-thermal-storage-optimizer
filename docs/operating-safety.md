@@ -49,7 +49,12 @@ The final states follow this order:
    disabled the controller.
 5. Manual Use/Reserve requests apply.
 6. Auto uses the plan, or reports `COLD_OR_EMPTY` when no usable heat remains.
-7. Minimum dwell holds ordinary command changes to prevent chatter.
+7. Minimum dwell holds automatic (Auto) command changes to prevent chatter.
+
+Dwell is measured from the last actual use/reserve change, so nothing is held
+before the first change after a load; startup grace guards that period. Explicit
+manual Use/Reserve selections are not chatter and apply at once, while Auto
+continues to observe dwell, including after a manual change.
 
 Forced use is immediate and bypasses dwell. It remains latched until all valid
 tank-layer readings are at or below the high threshold minus hysteresis. Manual
@@ -81,7 +86,8 @@ The condensed safety checks below remain mandatory.
    integration unload all request OFF.
 7. Verify a tank-layer high-temperature crossing immediately overrides manual
    Reserve, and hysteresis prevents rapid release/re-entry.
-8. Verify minimum dwell prevents ordinary use/reserve chatter.
+8. Verify minimum dwell prevents use/reserve chatter in Auto, and that manual
+   Use/Reserve selections apply immediately.
 9. Only then enable active control for a limited, attended period. Review the
    operating-state and decision-reason entities after every transition.
 10. Separately commission the advisor in observation-only use: check preferred

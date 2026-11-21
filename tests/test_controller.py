@@ -178,3 +178,77 @@ def test_dry_run_permission_and_output_inversion_are_independent() -> None:
     inverted = _machine(output_inverted=True)
     assert not inverted.evaluate(_input(mode=UserMode.RESERVE_TANK)).output_on
     assert inverted.evaluate(_input(mode=UserMode.USE_TANK)).output_on
+
+
+def test_manual_modes_bypass_dwell_but_auto_is_still_held() -> None:
+    """An explicit manual selection applies at once; Auto still observes dwell."""
+    machine = _machine(minimum_dwell=timedelta(minutes=30))
+    reserve = machine.evaluate(
+        _input(now=NOW + timedelta(minutes=1), mode=UserMode.RESERVE_TANK)
+    )
+    assert reserve.state is OperatingState.RESERVE_TANK
+    assert reserve.output_on
+    use = machine.evaluate(
+        _input(now=NOW + timedelta(minutes=2), mode=UserMode.USE_TANK)
+    )
+    assert use.state is OperatingState.USE_TANK
+    assert not use.output_on
+    again = machine.evaluate(
+        _input(now=NOW + timedelta(minutes=3), mode=UserMode.RESERVE_TANK)
+    )
+    assert again.output_on
+    # Returning to Auto within the dwell of the manual change holds its command.
+    held = machine.evaluate(_input(now=NOW + timedelta(minutes=4)))
+    assert held.state is OperatingState.RESERVE_TANK
+    assert "Minimum dwell" in held.reason
+    assert held.output_on
+    released = machine.evaluate(_input(now=NOW + timedelta(minutes=34)))
+    assert released.state is OperatingState.USE_TANK
+    assert not released.output_on
+
+
+def test_dwell_is_measured_from_the_last_change_not_from_startup() -> None:
+    """The first automatic reserve after start-up grace is not held by dwell."""
+    machine = _machine(
+        startup_grace=timedelta(minutes=5), minimum_dwell=timedelta(minutes=30)
+    )
+    during_grace = machine.evaluate(
+        _input(
+            now=NOW + timedelta(minutes=1),
+            recommendation=Recommendation.RESERVE_TANK,
+        )
+    )
+    assert during_grace.state is OperatingState.WAITING_FOR_DATA
+    assert not during_grace.output_on
+    first = machine.evaluate(
+        _input(
+            now=NOW + timedelta(minutes=6),
+            recommendation=Recommendation.RESERVE_TANK,
+        )
+    )
+    assert first.state is OperatingState.RESERVE_TANK
+    assert first.output_on
+    held = machine.evaluate(_input(now=NOW + timedelta(minutes=7)))
+    assert held.state is OperatingState.RESERVE_TANK
+    assert "Minimum dwell" in held.reason
+
+
+def test_manual_reserve_still_respects_grace_and_forced_use() -> None:
+    """Bypassing dwell never bypasses start-up grace or the high-limit override."""
+    machine = _machine(
+        startup_grace=timedelta(minutes=5), minimum_dwell=timedelta(minutes=30)
+    )
+    grace = machine.evaluate(
+        _input(now=NOW + timedelta(minutes=1), mode=UserMode.RESERVE_TANK)
+    )
+    assert grace.state is OperatingState.WAITING_FOR_DATA
+    assert not grace.output_on
+    forced = machine.evaluate(
+        _input(
+            now=NOW + timedelta(minutes=10),
+            mode=UserMode.RESERVE_TANK,
+            tank_temperatures_c=(86, 70, 50),
+        )
+    )
+    assert forced.state is OperatingState.FORCED_USE
+    assert not forced.output_on

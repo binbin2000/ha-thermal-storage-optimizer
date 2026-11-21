@@ -32,6 +32,13 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Manual **Use tank** and **Reserve tank** selections now apply immediately
+  instead of being held by minimum dwell, and dwell is measured from the last
+  actual use/reserve change rather than from integration load. Previously no
+  reserve command, manual or automatic, could take effect during the first dwell
+  period (30 minutes by default) after every restart, reload, or saved option.
+  Auto still observes dwell, and startup grace and the high-temperature override
+  are unchanged.
 - Minimum output dwell now applies to contiguous release windows instead of
   each price period. With 15-minute market resolution and the default 30-minute
   dwell, every period was shorter than the dwell and no tank energy was ever

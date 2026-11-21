@@ -166,8 +166,9 @@ shunt-curve/tank use and output ON applies the −50 °C reserve offset. Inversi
 reverses normal use/reserve calls, but load, unload, invalid data, missing plan,
 recoverable exception, and service-failure fallback always request physical
 OFF. Any valid tank layer at the configured high limit forces use immediately,
-including in manual Reserve mode; hysteresis prevents premature release. Normal
-changes observe minimum dwell, while forced use and fail-safe OFF do not.
+including in manual Reserve mode; hysteresis prevents premature release. Automatic
+changes observe minimum dwell, measured from the last actual use/reserve change;
+manual Use/Reserve selections, forced use, and fail-safe OFF apply at once.
 
 The Milestone 6 charging advisor turns unmet high-value forecast demand into a
 manual stove-firing recommendation. Its target is capped by calibrated usable

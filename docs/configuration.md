@@ -97,7 +97,7 @@ charge and capacity limits.
 | Forced-use high-temperature threshold | 85 °C | 20–120 °C | Any valid tank layer at or above this value immediately forces tank use. |
 | Forced-use hysteresis | 5 °C | 0.5–30 °C | Keeps forced use latched until every valid layer is this far below the threshold. Must be lower than the threshold. |
 | Startup grace period | 300 s | 0–3,600 s | Prevents the reserve output from energizing after a load, reload, or restart. |
-| Minimum output dwell time | 1,800 s | 0–14,400 s | Prevents output chatter. Forced high-temperature use and fail-safe off remain immediate. |
+| Minimum output dwell time | 1,800 s | 0–14,400 s | Prevents output chatter in Auto, measured from the last actual use/reserve change. Manual Use/Reserve selections, forced high-temperature use, and fail-safe off remain immediate. |
 
 Home Assistant is not a safety controller. Independent boiler/stove,
 overtemperature, pressure, circulation, and freeze protection must remain in place.
