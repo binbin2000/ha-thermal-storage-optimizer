@@ -19,6 +19,9 @@ views:
         last_optimization_entity: sensor.thermal_storage_optimizer_last_optimization
         plan_status_entity: sensor.thermal_storage_optimizer_plan_status
 
+      - type: custom:thermal-storage-day-chart-card
+        title: Today and tomorrow
+
       - type: entities
         title: Decision and control boundary
         show_header_toggle: false

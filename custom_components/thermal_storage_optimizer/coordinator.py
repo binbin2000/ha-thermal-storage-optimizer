@@ -303,6 +303,10 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
         """Expose the read-only input adapter for diagnostics."""
         return self._adapter
 
+    def price_forecast(self) -> PriceForecast:
+        """Return the normalized source forecast, including already-past intervals."""
+        return self._adapter.price_forecast(self._price_config)
+
     async def async_start(self) -> None:
         """Create the initial snapshot, then subscribe for recovery updates."""
         await self._adapter.async_prepare_price_forecast(self._price_config)

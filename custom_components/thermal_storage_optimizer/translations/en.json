@@ -380,6 +380,10 @@
         }
       }
     },
+    "get_day_chart": {
+      "name": "Get day chart data",
+      "description": "Return prices, the tank plan, and the firing advice for today and tomorrow for the bundled day-chart card."
+    },
     "reset_learned_state": {
       "name": "Reset learned state",
       "description": "Reset bounded adaptive calibration while retaining deterministic settings, plans, modes, and safety state."

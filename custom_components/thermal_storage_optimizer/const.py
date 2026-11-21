@@ -167,6 +167,7 @@ SERVICE_SNOOZE: Final = "snooze_recommendation"
 SERVICE_DISMISS: Final = "dismiss_recommendation"
 SERVICE_RECALCULATE: Final = "recalculate"
 SERVICE_GET_PLAN_SUMMARY: Final = "get_plan_summary"
+SERVICE_GET_DAY_CHART: Final = "get_day_chart"
 SERVICE_RESET_LEARNED_STATE: Final = "reset_learned_state"
 DEFAULT_PLAN_SUMMARY_INTERVALS: Final = 12
 MAX_PLAN_SUMMARY_INTERVALS: Final = 48

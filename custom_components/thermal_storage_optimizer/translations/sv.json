@@ -380,6 +380,10 @@
         }
       }
     },
+    "get_day_chart": {
+      "name": "Hämta data för dygnsdiagram",
+      "description": "Returnera elpris, tankplan och eldningsråd för idag och imorgon till det medföljande dygnsdiagramkortet."
+    },
     "reset_learned_state": {
       "name": "Återställ inlärt tillstånd",
       "description": "Återställ begränsad adaptiv kalibrering men behåll deterministiska inställningar, planer, lägen och säkerhetstillstånd."
