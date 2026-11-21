@@ -32,6 +32,11 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The planner's decision reason now shows the next release in Home Assistant's
+  local time, rounded up to the whole minute, instead of a raw UTC timestamp with
+  microseconds that looked like a time in the past and changed the entity state
+  on every replan. A reused plan no longer produces a reason starting with a
+  dangling semicolon.
 - Manual **Use tank** and **Reserve tank** selections now apply immediately
   instead of being held by minimum dwell, and dwell is measured from the last
   actual use/reserve change rather than from integration load. Previously no

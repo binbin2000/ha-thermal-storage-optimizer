@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -372,3 +373,47 @@ def test_active_short_release_continues_at_quarter_hour_resolution() -> None:
     )
     assert plan.intervals[0].allocated_energy_kwh == pytest.approx(0.4)
     assert plan.recommendation_at(NOW) is Recommendation.USE_TANK
+
+
+def test_reserve_reason_uses_local_time_rounded_up_to_the_minute() -> None:
+    """The release time is readable local time and never names a past moment."""
+    plan = optimize_plan(
+        (economic(0, 1, 0.1, 5), economic(1, 1, 3, 6), economic(2, 1, 0.1, 5)),
+        publication_key="reason",
+        optimized_at=NOW,
+        available_energy_kwh=2.123,
+        economic_deadband_per_kwh=0.05,
+    )
+    release = plan.next_release_at(NOW)
+    assert release is not None
+    assert release.second or release.microsecond
+    stockholm = ZoneInfo("Europe/Stockholm")
+    reason = plan.decision_reason_at(NOW, local_timezone=stockholm)
+    # 11:00 UTC is 13:00 in Stockholm; the 2.123 kWh release ends at 15:00 local.
+    assert reason == "Reserve tank for higher-value interval at 14:39"
+    assert "+00:00" not in reason
+    assert plan.decision_reason_at(NOW) == (
+        "Reserve tank for higher-value interval at 12:39"
+    )
+    slightly_less = optimize_plan(
+        (economic(0, 1, 0.1, 5), economic(1, 1, 3, 6), economic(2, 1, 0.1, 5)),
+        publication_key="reason",
+        optimized_at=NOW,
+        available_energy_kwh=2.120,
+        economic_deadband_per_kwh=0.05,
+    )
+    # A small energy change within the same minute does not change the text.
+    assert slightly_less.decision_reason_at(NOW, local_timezone=stockholm) == reason
+
+
+def test_reserve_reason_includes_the_date_for_another_local_day() -> None:
+    """A release on a later local day is shown with its date."""
+    plan = optimize_plan(
+        (economic(0, 1, 0.1, 5), economic(11.5, 1, 3, 2)),
+        publication_key="tomorrow",
+        optimized_at=NOW,
+        available_energy_kwh=2,
+        economic_deadband_per_kwh=0.05,
+    )
+    reason = plan.decision_reason_at(NOW, local_timezone=ZoneInfo("Europe/Stockholm"))
+    assert reason == "Reserve tank for higher-value interval at 2026-09-08 00:30"

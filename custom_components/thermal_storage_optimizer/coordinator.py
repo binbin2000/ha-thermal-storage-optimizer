@@ -18,6 +18,7 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.util import dt as dt_util
 
 from .adaptive import (
     AdaptiveCalibration,
@@ -619,6 +620,14 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
         )
         return max(share, 0.0) / 100.0 * rated
 
+    def _decision_reason(self, now: datetime) -> str:
+        """Explain the current plan decision using Home Assistant's local time."""
+        if self._plan is None:
+            return ""
+        return self._plan.decision_reason_at(
+            now, local_timezone=dt_util.get_default_time_zone()
+        )
+
     def _cancel_dispatch_timer(self) -> None:
         """Replace or remove the timer for the next binary dispatch boundary."""
         if self._dispatch_timer is not None:
@@ -715,7 +724,7 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             return (
                 self._plan,
                 PlanStatus.SAVED_PLAN if continuation else PlanStatus.FULL_FORECAST,
-                f"{continuation}; {self._plan.decision_reason_at(now)}",
+                _join_reason(continuation, self._decision_reason(now)),
                 self._plan.recommendation_at(now),
                 rejected,
             )
@@ -730,7 +739,7 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                     PlanStatus.SAVED_PLAN,
                     (
                         "Model inputs unavailable; continuing last valid plan; "
-                        f"{self._plan.decision_reason_at(now)}"
+                        f"{self._decision_reason(now)}"
                     ),
                     self._plan.recommendation_at(now),
                     rejected,
@@ -799,7 +808,7 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
         )
         reason = (
             f"{continuation or 'Rolling allocation optimized'}; "
-            f"{self._plan.decision_reason_at(now)}"
+            f"{self._decision_reason(now)}"
         )
         if rejected:
             reason += f"; ignored {rejected} malformed interval(s)"
@@ -833,6 +842,11 @@ def _bool_value(snapshot: NormalizedInputSnapshot, key: str) -> bool | None:
         if normalized is not None and isinstance(normalized.value, bool)
         else None
     )
+
+
+def _join_reason(*parts: str) -> str:
+    """Join the non-empty parts of an explanation with a semicolon."""
+    return "; ".join(part for part in parts if part)
 
 
 def _bounded_explanation(reason: str) -> str:
