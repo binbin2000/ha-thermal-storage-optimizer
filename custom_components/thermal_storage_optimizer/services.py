@@ -6,15 +6,18 @@ from typing import TYPE_CHECKING
 
 import voluptuous as vol
 from homeassistant.core import ServiceCall, ServiceResponse, SupportsResponse
+from homeassistant.util import dt as dt_util
 
 from .const import (
     DEFAULT_PLAN_SUMMARY_INTERVALS,
     DOMAIN,
     MAX_PLAN_SUMMARY_INTERVALS,
+    SERVICE_GET_DAY_CHART,
     SERVICE_GET_PLAN_SUMMARY,
     SERVICE_RECALCULATE,
     SERVICE_RESET_LEARNED_STATE,
 )
+from .day_chart import build_day_chart
 from .plan_summary import build_plan_summary
 
 if TYPE_CHECKING:
@@ -33,6 +36,9 @@ async def async_setup_actions(entry: ThermalStorageOptimizerConfigEntry) -> None
             entry.runtime_data,
             max_intervals=int(call.data["max_intervals"]),
         )
+
+    async def handle_get_day_chart(_call: ServiceCall) -> ServiceResponse:
+        return build_day_chart(entry.runtime_data, now=dt_util.utcnow())
 
     async def handle_reset_learned_state(_call: ServiceCall) -> ServiceResponse:
         await entry.runtime_data.async_reset_calibration()
@@ -66,6 +72,12 @@ async def async_setup_actions(entry: ThermalStorageOptimizerConfigEntry) -> None
     )
     hass.services.async_register(
         DOMAIN,
+        SERVICE_GET_DAY_CHART,
+        handle_get_day_chart,
+        supports_response=SupportsResponse.ONLY,
+    )
+    hass.services.async_register(
+        DOMAIN,
         SERVICE_RESET_LEARNED_STATE,
         handle_reset_learned_state,
         supports_response=SupportsResponse.ONLY,
@@ -77,6 +89,7 @@ def async_unload_actions(entry: ThermalStorageOptimizerConfigEntry) -> None:
     for action in (
         SERVICE_RECALCULATE,
         SERVICE_GET_PLAN_SUMMARY,
+        SERVICE_GET_DAY_CHART,
         SERVICE_RESET_LEARNED_STATE,
     ):
         if entry.runtime_data.hass.services.has_service(DOMAIN, action):

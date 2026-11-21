@@ -16,10 +16,10 @@ from custom_components.thermal_storage_optimizer.const import (
     UNIQUE_ID,
 )
 from custom_components.thermal_storage_optimizer.frontend import (
-    CARD_FILENAME,
-    CARD_MODULE_URL,
-    CARD_URL_PATH,
+    CARD_FILENAMES,
     DATA_STATIC_PATH_REGISTERED,
+    card_module_url,
+    card_url_path,
 )
 
 from .helpers import REQUIRED_CONFIG, set_valid_required_states
@@ -51,17 +51,22 @@ async def test_setup_registers_and_unload_removes_card_module(
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-    assert CARD_MODULE_URL in hass.data[DATA_EXTRA_MODULE_URL].urls
+    module_urls = [card_module_url(filename) for filename in CARD_FILENAMES]
+    assert len(CARD_FILENAMES) == 2
+    for module_url in module_urls:
+        assert module_url in hass.data[DATA_EXTRA_MODULE_URL].urls
     assert hass.data[DATA_STATIC_PATH_REGISTERED] is True
     configs = register_paths.await_args.args[0]
-    assert len(configs) == 1
-    assert configs[0].url_path == CARD_URL_PATH
-    assert configs[0].path.endswith(CARD_FILENAME)
-    assert configs[0].cache_headers is True
+    assert len(configs) == len(CARD_FILENAMES)
+    for config, filename in zip(configs, CARD_FILENAMES, strict=True):
+        assert config.url_path == card_url_path(filename)
+        assert config.path.endswith(filename)
+        assert config.cache_headers is True
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
-    assert CARD_MODULE_URL not in hass.data[DATA_EXTRA_MODULE_URL].urls
+    for module_url in module_urls:
+        assert module_url not in hass.data[DATA_EXTRA_MODULE_URL].urls
 
     with patch.object(
         hass.http,
@@ -72,5 +77,6 @@ async def test_setup_registers_and_unload_removes_card_module(
         await hass.async_block_till_done()
 
     assert register_paths_after_reload.await_count == 0
-    assert CARD_MODULE_URL in hass.data[DATA_EXTRA_MODULE_URL].urls
+    for module_url in module_urls:
+        assert module_url in hass.data[DATA_EXTRA_MODULE_URL].urls
     assert await hass.config_entries.async_unload(entry.entry_id)

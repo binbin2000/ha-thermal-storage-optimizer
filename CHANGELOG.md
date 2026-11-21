@@ -7,6 +7,10 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Bundled `custom:thermal-storage-day-chart-card` dashboard card showing today
+  and tomorrow on one time axis: electricity price, the planned firing window,
+  detected firing, and planned versus actual use/reserve of the tank. It is fed
+  by the new `get_day_chart` response action and recorder history.
 - Hourly outdoor-temperature forecasts from the selected weather entity now drive
   per-interval heat demand. The forecast is bias-corrected toward the measured
   outdoor temperature over the first six hours and falls back to the measured value

@@ -223,6 +223,17 @@ refreshes when plan status or the last-optimization sensor changes and provides 
 manual **Recalculate** action. Override the two entity IDs in the dashboard YAML if
 Home Assistant assigned non-default names.
 
+A second bundled card, `custom:thermal-storage-day-chart-card`, shows today and
+tomorrow on one time axis: the electricity price, the planned firing window (with
+the latest start marked), detected firing, and planned versus actual use/reserve of
+the tank. It needs no configuration beyond an optional `title`. Prices, the future
+plan, and the firing advice come from the `thermal_storage_optimizer.get_day_chart`
+action; everything left of the current-time marker in the tank and firing rows is
+read from recorder history for the operating-state, tank-release-recommended, and
+stove-firing entities. Limitations: tomorrow stays empty until its prices are
+published, only the next firing session is planned, and without the recorder the
+past outcome rows are blank.
+
 ## Roadmap
 
 - [x] Milestone 1: repository foundation and integration skeleton
