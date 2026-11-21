@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, tzinfo
 from enum import StrEnum
 from itertools import pairwise
 from typing import TYPE_CHECKING, Final
@@ -95,8 +95,16 @@ class OptimizationPlan:
                 return period.release_start
         return None
 
-    def decision_reason_at(self, now: datetime) -> str:
-        """Explain the current dry-run decision with bounded economic detail."""
+    def decision_reason_at(
+        self, now: datetime, *, local_timezone: tzinfo | None = None
+    ) -> str:
+        """Explain the current dry-run decision with bounded economic detail.
+
+        Times are shown in ``local_timezone`` (the timezone of ``now`` when
+        omitted) and rounded up to the whole minute, so the text is readable,
+        never names a moment that has already passed, and does not change on
+        every replan.
+        """
         for period in self.intervals:
             if (
                 period.forecast.start.timestamp()
@@ -114,10 +122,26 @@ class OptimizationPlan:
                     )
                 next_release = self.next_release_at(now)
                 if next_release is not None:
-                    release_time = next_release.isoformat()
+                    release_time = _local_minute_text(next_release, now, local_timezone)
                     return f"Reserve tank for higher-value interval at {release_time}"
                 return "Reserve tank: no known interval clears the economic deadband"
         return "No priced current interval; preserve the saved allocation"
+
+
+def _local_minute_text(
+    instant: datetime, now: datetime, local_timezone: tzinfo | None
+) -> str:
+    """Format a time in local time, rounded up to the minute.
+
+    The date is included only when it differs from the local date of ``now``.
+    """
+    zone = local_timezone or now.tzinfo
+    local = instant.astimezone(zone)
+    if local.second or local.microsecond:
+        local = local.replace(second=0, microsecond=0) + timedelta(minutes=1)
+    if local.date() == now.astimezone(zone).date():
+        return local.strftime("%H:%M")
+    return local.strftime("%Y-%m-%d %H:%M")
 
 
 def optimize_plan(  # noqa: PLR0913

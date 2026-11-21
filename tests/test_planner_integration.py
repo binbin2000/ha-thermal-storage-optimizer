@@ -237,6 +237,13 @@ async def test_periodic_planning_refreshes_unchanged_inputs(
     await hass.async_block_till_done()
     new = coordinator.data.plan
     assert new is not None
+    assert coordinator.data.plan_reason.startswith("Rolling allocation optimized; ")
+    # A refresh that reuses the plan must not leave a dangling separator.
+    coordinator._async_validity_refresh(coordinator.data.captured_at)  # noqa: SLF001
+    await hass.async_block_till_done()
+    assert coordinator.data.plan is new
+    assert not coordinator.data.plan_reason.startswith(";")
+    assert "+00:00" not in coordinator.data.plan_reason
     assert new.optimized_at > original.optimized_at
     assert new.publication_key == original.publication_key
     assert new.reserve_until == original.reserve_until

@@ -94,7 +94,8 @@ terminals/controller, not only in Home Assistant.
    expected −50 °C shunt-offset input and adequate heat-pump flow/volume.
 3. Select **Use tank**, then **Disabled**, and confirm OFF returns normal local shunt
    control.
-4. Repeat a normal command change inside minimum dwell and confirm chatter is held.
+4. Confirm manual Use/Reserve selections apply immediately, then return to Auto
+   and confirm a plan-driven change inside minimum dwell is held.
 5. Raise only a simulated/test temperature if possible; otherwise use a carefully
    supervised natural crossing. Confirm high temperature forces immediate use even
    from manual Reserve.

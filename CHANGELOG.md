@@ -32,6 +32,18 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The planner's decision reason now shows the next release in Home Assistant's
+  local time, rounded up to the whole minute, instead of a raw UTC timestamp with
+  microseconds that looked like a time in the past and changed the entity state
+  on every replan. A reused plan no longer produces a reason starting with a
+  dangling semicolon.
+- Manual **Use tank** and **Reserve tank** selections now apply immediately
+  instead of being held by minimum dwell, and dwell is measured from the last
+  actual use/reserve change rather than from integration load. Previously no
+  reserve command, manual or automatic, could take effect during the first dwell
+  period (30 minutes by default) after every restart, reload, or saved option.
+  Auto still observes dwell, and startup grace and the high-temperature override
+  are unchanged.
 - Minimum output dwell now applies to contiguous release windows instead of
   each price period. With 15-minute market resolution and the default 30-minute
   dwell, every period was shorter than the dwell and no tank energy was ever
