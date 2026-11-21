@@ -40,6 +40,8 @@ from .const import (
     CONF_CHARGING_POWER_MIN,
     CONF_COP_MAX,
     CONF_COP_MIN,
+    CONF_CURVE_BIN_WIDTH,
+    CONF_CURVE_MIN_CONFIDENCE,
     CONF_ECONOMIC_DEADBAND,
     CONF_FIXED_COP,
     CONF_FORECAST_CONFIDENCE,
@@ -47,6 +49,7 @@ from .const import (
     CONF_HEAT_LOSS_MAX,
     CONF_HEAT_LOSS_MIN,
     CONF_HEAT_PUMP_ELECTRICAL_ENERGY,
+    CONF_HEAT_PUMP_ELECTRICAL_POWER,
     CONF_HEAT_PUMP_PRODUCED_HEAT,
     CONF_HOURLY_RETENTION,
     CONF_INITIAL_CHARGING_POWER,
@@ -63,10 +66,14 @@ from .const import (
     CONF_STOVE_CHARGING_PUMP,
     CONF_STOVE_FLOW_TEMPERATURE,
     CONF_STOVE_TEMPERATURE_THRESHOLD,
+    CONF_SUPPLEMENTARY_HEATER_POWER,
+    CONF_SUPPLEMENTARY_HEATER_RATED_POWER,
+    CONF_SUPPLEMENTARY_HEATER_SHARE,
     CONF_SUPPLY_TARGET,
     CONF_TANK_BOTTOM,
     CONF_TANK_MIDDLE,
     CONF_TANK_TOP,
+    CONF_TEMPERATURE_CURVES,
     CONF_TOP_LAYER_VOLUME,
     CONF_TOTAL_TANK_VOLUME,
     CONF_TREND_DEADBAND,
@@ -83,6 +90,8 @@ from .const import (
     DEFAULT_CHARGING_POWER_MIN,
     DEFAULT_COP_MAX,
     DEFAULT_COP_MIN,
+    DEFAULT_CURVE_BIN_WIDTH,
+    DEFAULT_CURVE_MIN_CONFIDENCE,
     DEFAULT_ECONOMIC_DEADBAND,
     DEFAULT_FIXED_COP,
     DEFAULT_FORECAST_CONFIDENCE,
@@ -99,13 +108,17 @@ from .const import (
     DEFAULT_RESIDUAL_MAX,
     DEFAULT_RESIDUAL_MIN,
     DEFAULT_STOVE_TEMPERATURE_THRESHOLD,
+    DEFAULT_SUPPLEMENTARY_HEATER_RATED_POWER,
+    DEFAULT_TEMPERATURE_CURVES,
     DEFAULT_TOTAL_TANK_VOLUME,
     DEFAULT_TREND_DEADBAND,
     DEFAULT_USABLE_CAPACITY,
     DOMAIN,
+    SUPPLY_TEMPERATURE_LIMITS_C,
 )
 from .controller import OperatingState, SupervisoryController
-from .cop import CopEstimate, CopSource, FixedCopModel, estimate_cop
+from .cop import CopEstimate, CopSource, FixedCopModel, estimate_cop, system_cop
+from .curves import CurveConfig, TemperatureCurveSet
 from .data import PlanStatus, RuntimeSnapshot
 from .demand import HeatDemandConfig, estimate_heat_demand_kwh
 from .energy import TankTemperatures, ThermalEnergyConfig, estimate_thermal_state
@@ -125,6 +138,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _VALIDITY_REFRESH_INTERVAL = timedelta(minutes=1)
+_WEATHER_REFRESH_INTERVAL = timedelta(hours=1)
 _STORAGE_VERSION = 1
 _MAX_EXPLANATION_LENGTH: Final = 320
 
@@ -249,6 +263,26 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                 ),
             )
         )
+        self._curve_store = Store[dict[str, object]](
+            hass, 1, f"{DOMAIN}.{entry.entry_id}.curves"
+        )
+        self.curves = TemperatureCurveSet(
+            CurveConfig(
+                enabled=options.get(CONF_TEMPERATURE_CURVES, DEFAULT_TEMPERATURE_CURVES)
+                is True,
+                bin_width_c=_option(
+                    options, CONF_CURVE_BIN_WIDTH, DEFAULT_CURVE_BIN_WIDTH
+                ),
+                minimum_confidence=_option(
+                    options, CONF_CURVE_MIN_CONFIDENCE, DEFAULT_CURVE_MIN_CONFIDENCE
+                ),
+                supply_bounds=ParameterBounds(*SUPPLY_TEMPERATURE_LIMITS_C),
+                cop_bounds=ParameterBounds(
+                    _option(options, CONF_COP_MIN, DEFAULT_COP_MIN),
+                    _option(options, CONF_COP_MAX, DEFAULT_COP_MAX),
+                ),
+            )
+        )
         self._prices: PriceForecast | None = None
         self._planning_inputs: tuple[object, ...] | None = None
         self._reserve_until: datetime | None = None
@@ -264,12 +298,22 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
         self.controller = SupervisoryController(hass, entry, self)
         self.advisor = ChargingAdvisor(hass, entry, self)
 
+    @property
+    def adapter(self) -> HomeAssistantInputAdapter:
+        """Expose the read-only input adapter for diagnostics."""
+        return self._adapter
+
     async def async_start(self) -> None:
         """Create the initial snapshot, then subscribe for recovery updates."""
         await self._adapter.async_prepare_price_forecast(self._price_config)
+        await self._adapter.async_prepare_outdoor_forecast()
         stored = await self._store.async_load()
         calibration = await self._calibration_store.async_load()
         self.calibration.restore(calibration, now=self._adapter.snapshot().captured_at)
+        self.curves.restore(
+            await self._curve_store.async_load(),
+            now=self._adapter.snapshot().captured_at,
+        )
         self._plan = deserialize_plan(stored, now=self._adapter.snapshot().captured_at)
         self._plan_loaded_from_storage = self._plan is not None
         if self._plan is not None:
@@ -302,11 +346,21 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                 cancel_on_shutdown=True,
             )
         )
+        if self._adapter.weather_entity_id is not None:
+            self._entry.async_on_unload(
+                async_track_time_interval(
+                    self.hass,
+                    self._async_scheduled_weather_refresh,
+                    _WEATHER_REFRESH_INTERVAL,
+                    cancel_on_shutdown=True,
+                )
+            )
 
     async def async_recalculate(self) -> None:
         """Refresh provider data and rebuild the plan from the current snapshot."""
         async with self._price_refresh_lock:
             await self._adapter.async_prepare_price_forecast(self._price_config)
+            await self._adapter.async_prepare_outdoor_forecast()
             self._force_recalculation = True
             try:
                 self._refresh_snapshot()
@@ -325,12 +379,34 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                 f"refresh {DOMAIN} Nord Pool forecast",
             )
             return
+        if event.data["entity_id"] == self._adapter.weather_entity_id:
+            self._schedule_weather_refresh()
+            return
         self._refresh_or_fallback()
 
     async def _async_refresh_official_price(self) -> None:
         """Serialize official Nord Pool response-action refreshes."""
         async with self._price_refresh_lock:
             await self._adapter.async_prepare_price_forecast(self._price_config)
+            self._refresh_or_fallback()
+
+    @callback
+    def _async_scheduled_weather_refresh(self, _now: datetime) -> None:
+        """Refresh the hourly forecast even when the weather state is unchanged."""
+        self._schedule_weather_refresh()
+
+    @callback
+    def _schedule_weather_refresh(self) -> None:
+        """Run the weather response action outside the state-change callback."""
+        self.hass.async_create_task(
+            self._async_refresh_outdoor_forecast(),
+            f"refresh {DOMAIN} weather forecast",
+        )
+
+    async def _async_refresh_outdoor_forecast(self) -> None:
+        """Serialize weather response-action refreshes with price refreshes."""
+        async with self._price_refresh_lock:
+            await self._adapter.async_prepare_outdoor_forecast()
             self._refresh_or_fallback()
 
     @callback
@@ -400,6 +476,21 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
         )
         outdoor = _numeric_value(inputs, CONF_OUTDOOR_TEMPERATURE)
         supply_target = _numeric_value(inputs, CONF_SUPPLY_TARGET)
+        measured_cop, heater_share = self._effective_measured_cop(inputs)
+        if self.curves.observe(
+            now=inputs.captured_at,
+            outdoor_c=outdoor,
+            supply_target_c=supply_target,
+            measured_cop=measured_cop,
+            heat_pump_power_kw=_numeric_value(inputs, CONF_HEAT_PUMP_ELECTRICAL_POWER),
+            heater_heat_share=heater_share,
+        ):
+            # Samples are accepted at most once per bin per 30 minutes, so an
+            # immediate save stays infrequent and survives reload without a flush.
+            self.hass.async_create_task(
+                self._curve_store.async_save(self.curves.serialize()),
+                f"save {DOMAIN} temperature curves",
+            )
         hourly_demand = None
         cop = None
         if outdoor is not None:
@@ -407,16 +498,15 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                 outdoor, timedelta(hours=1), effective_demand_config
             )
         if outdoor is not None and supply_target is not None:
+            # Current COP: measurement, learned curve, calibrated scalar, fixed.
             cop = estimate_cop(
-                effective_cop_model,
+                self.curves.cop_model(inputs.captured_at, effective_cop_model),
                 outdoor_temperature_c=outdoor,
                 supply_temperature_c=supply_target,
-                measured_cop=_numeric_value(inputs, CONF_MEASURED_COP),
+                measured_cop=measured_cop,
             )
             calibrated_cop = self.calibration.parameters["cop"]
-            if _numeric_value(
-                inputs, CONF_MEASURED_COP
-            ) is None and calibrated_cop.usable(
+            if cop.source is CopSource.FIXED_FALLBACK and calibrated_cop.usable(
                 self.calibration.config.minimum_confidence
             ):
                 cop = CopEstimate(
@@ -428,7 +518,7 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             thermal.confidence,
             outdoor,
             supply_target,
-            _numeric_value(inputs, CONF_MEASURED_COP),
+            measured_cop,
             cop.confidence if cop is not None else 0.0,
             demand_config=effective_demand_config,
             cop_model=effective_cop_model,
@@ -443,6 +533,7 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             _bounded_explanation(reason),
             recommendation,
             rejected,
+            supplementary_heat_share=heater_share,
         )
         self.has_received_valid_data = self.has_received_valid_data or inputs.is_valid
         self.async_set_updated_data(snapshot)
@@ -488,6 +579,46 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                     f"save {DOMAIN} calibration",
                 )
 
+    def _effective_measured_cop(
+        self, inputs: NormalizedInputSnapshot
+    ) -> tuple[float | None, float | None]:
+        """Return the measured COP and the supplementary heater's heat share.
+
+        When heat-pump electrical power and supplementary heater power are both
+        known, the measured compressor COP is combined into the system's
+        effective COP, because the resistive heater delivers its share at COP 1.
+        """
+        measured_cop = _numeric_value(inputs, CONF_MEASURED_COP)
+        heat_pump_power = _numeric_value(inputs, CONF_HEAT_PUMP_ELECTRICAL_POWER)
+        heater_power = self._supplementary_heater_power_kw(inputs)
+        if measured_cop is None or heat_pump_power is None or heater_power is None:
+            return measured_cop, None
+        combined = system_cop(
+            heat_pump_cop=measured_cop,
+            heat_pump_power_kw=heat_pump_power,
+            heater_power_kw=heater_power,
+        )
+        if combined is None:
+            return measured_cop, None
+        return combined.value, combined.heater_heat_share
+
+    def _supplementary_heater_power_kw(
+        self, inputs: NormalizedInputSnapshot
+    ) -> float | None:
+        """Return heater electrical power from the power entity or share x rating."""
+        power = _numeric_value(inputs, CONF_SUPPLEMENTARY_HEATER_POWER)
+        if power is not None:
+            return max(power, 0.0)
+        share = _numeric_value(inputs, CONF_SUPPLEMENTARY_HEATER_SHARE)
+        if share is None:
+            return None
+        rated = _option(
+            dict(self._entry.options),
+            CONF_SUPPLEMENTARY_HEATER_RATED_POWER,
+            DEFAULT_SUPPLEMENTARY_HEATER_RATED_POWER,
+        )
+        return max(share, 0.0) / 100.0 * rated
+
     def _cancel_dispatch_timer(self) -> None:
         """Replace or remove the timer for the next binary dispatch boundary."""
         if self._dispatch_timer is not None:
@@ -497,7 +628,9 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
     async def async_reset_calibration(self) -> None:
         """Reset adaptive values without touching plans, modes, or safety state."""
         self.calibration.reset()
+        self.curves.reset()
         await self._calibration_store.async_save(self.calibration.serialize())
+        await self._curve_store.async_save(self.curves.serialize())
         self._refresh_snapshot()
 
     def _update_plan(  # noqa: C901, PLR0911, PLR0913, PLR0917
@@ -554,6 +687,11 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                 Recommendation.WAITING,
                 rejected,
             )
+        outdoor_forecast = self._adapter.outdoor_forecast
+        if self.curves.cop_curve_usable(now):
+            # The learned curve already contains the measurement; use it per
+            # interval instead of repeating the current reading across the horizon.
+            measured_cop = None
         planning_inputs = (
             available_energy_kwh,
             outdoor_temperature_c,
@@ -563,6 +701,9 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             cop_confidence,
             demand_config,
             cop_model,
+            outdoor_forecast,
+            # Only a usable curve changes the plan; learning alone must not churn it.
+            self.curves.revision if self.curves.any_usable(now) else None,
         )
         if (
             not self._force_recalculation
@@ -609,9 +750,17 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             outdoor_temperature_c=float(outdoor_temperature_c),
             supply_temperature_c=float(supply_temperature_c),
             measured_cop=measured_cop,
-            cop_model=cop_model,
+            cop_model=self.curves.cop_model(now, cop_model),
             demand_config=demand_config,
             model_config=model_config,
+            outdoor_forecast=outdoor_forecast,
+            supply_temperature_for=(
+                lambda outdoor: self.curves.supply_temperature_for(
+                    outdoor, now=now, fallback_c=float(supply_temperature_c)
+                )
+            )
+            if self.curves.heating_curve_usable(now)
+            else None,
         )
         if not forecast:
             if self._plan is not None:

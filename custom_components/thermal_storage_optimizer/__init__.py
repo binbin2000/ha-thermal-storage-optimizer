@@ -100,7 +100,7 @@ async def async_remove_entry(
     hass: HomeAssistant, entry: ThermalStorageOptimizerConfigEntry
 ) -> None:
     """Remove all private state after Home Assistant removes the config entry."""
-    for suffix in ("plan", "calibration", "controller", "advisor"):
+    for suffix in ("plan", "calibration", "controller", "advisor", "curves"):
         await Store[dict[str, object]](
             hass, 1, f"{DOMAIN}.{entry.entry_id}.{suffix}"
         ).async_remove()

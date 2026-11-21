@@ -1,5 +1,6 @@
 """Unit tests for the pure normalized input layer."""
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta, tzinfo
 
 import pytest
@@ -188,3 +189,32 @@ def test_invalid_digital_states_are_explicit(state: str) -> None:
 
     assert not snapshot.is_valid
     assert snapshot.issues[0].problem is InputProblem.INVALID_STATE
+
+
+@pytest.mark.parametrize(
+    ("state", "unit", "expected"),
+    [("45", "%", 45.0), ("0", "%", 0.0), ("100", "%", 100.0)],
+)
+def test_percentage_inputs_require_percent_unit(
+    state: str, unit: str, expected: float
+) -> None:
+    """Percentages normalize only with explicit percent unit metadata."""
+    now = datetime(2026, 11, 20, 12, tzinfo=UTC)
+    raw = RawInput(
+        key="share",
+        entity_id="sensor.share",
+        kind=InputKind.PERCENTAGE,
+        required=False,
+        state=state,
+        unit=unit,
+        updated_at=now,
+        stale_after=None,
+    )
+    snapshot = normalize_inputs((raw,), now)
+    assert snapshot.values["share"].value == expected
+    assert snapshot.values["share"].unit == "%"
+    for bad_state, bad_unit in (("45", None), ("45", "kW"), ("120", "%"), ("-1", "%")):
+        issue = normalize_inputs(
+            (replace(raw, state=bad_state, unit=bad_unit),), now
+        ).issues[0]
+        assert issue.problem is InputProblem.INCOMPATIBLE_UNIT

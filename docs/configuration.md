@@ -41,14 +41,16 @@ make the required input set invalid.
 | --- | --- | --- |
 | Actual supply temperature | Temperature sensor | Additional observed supply temperature. |
 | Indoor temperature | Temperature sensor | Additional indoor-condition measurement. |
-| Weather forecast | `weather` entity | Validates weather availability. The current release still repeats measured outdoor temperature in forecast demand calculations rather than applying hourly weather forecasts. |
+| Weather forecast | `weather` entity | Supplies the hourly outdoor-temperature forecast through the core `weather.get_forecasts` action. Each price interval uses the forecast at its midpoint, corrected by the difference between the measured outdoor temperature and the forecast for the current time (the correction fades out over six hours). The forecast is refreshed at load, when the weather entity updates, hourly, and on `recalculate`. A failed, malformed, or more than 12-hour-old forecast falls back to the measured outdoor temperature for every interval. |
 | Heat-pump electrical power | Power sensor | Instantaneous heat-pump electrical consumption for diagnostics and calibration evidence. |
 | Heat-pump electrical energy | Energy sensor | Cumulative electrical energy; pair with produced heat energy for adaptive COP calibration. |
 | Heat-pump produced heat energy | Energy sensor | Cumulative delivered heat used by adaptive calibration and validation. |
-| Measured COP | Sensor | Preferred COP when its state is valid; otherwise the fixed or calibrated fallback is used. |
+| Measured COP | Sensor | Preferred current COP when its state is valid. With curve learning enabled it also teaches COP per outdoor-temperature bin, sampled only while the heat-pump electrical power (if configured) is above 0.1 kW. Otherwise the learned curve, calibrated, or fixed fallback is used. |
 | Stove charging pump | `binary_sensor`, `switch`, or `input_boolean` | One possible signal that a manual stove-firing session is active. |
 | Stove flow temperature | Temperature sensor | Detects firing when it exceeds the configured stove threshold. |
 | Tank/radiator flow rate | Volume-flow-rate sensor | Optional flow measurement for diagnostics. |
+| Supplementary electric heater electrical power | Power sensor | Electrical power of the heat pump's supplementary (immersion) heater. Together with the heat-pump electrical power and measured COP it gives the system's effective COP, where the heater's share of heat is delivered at COP 1, and the heater's heat share shown by the **Supplementary heater heat share** diagnostic. |
+| Supplementary electric heater output share | Sensor in `%` | Alternative to the heater power entity, for controllers that expose the additional-heat output as a percentage (for example Rego via Husdata). Heater power is the share times the configured rated power. |
 | Notification target | `notify` entity | Delivers charging-advisor recommendations and progress. Supported mobile-app targets may also show acknowledge, snooze, and dismiss actions. |
 
 An invalid optional measurement is reported in diagnostics but does not invalidate the
@@ -76,6 +78,10 @@ required input set.
 | Forecast confidence | 0.85 | 0–1 | Conservative discount applied to forecast value. |
 | Economic deadband | 0.05 currency/kWh heat | 0–100 | Minimum advantage over the horizon baseline before tank energy is allocated. |
 | Planning interval | 15 min | 1–60 min | Periodic plan refresh interval; relevant state changes can also trigger a refresh. |
+| Learn temperature-dependent curves | Off | On/off | Learns the heat pump's heating curve (supply target versus outdoor temperature) and, when a measured-COP entity is configured, COP versus outdoor temperature. When enough confident bins exist, each forecast interval uses the learned supply target and COP for its own outdoor temperature; outside the learned COP range a learned Carnot efficiency extrapolates, and the fixed or calibrated COP remains the last fallback. Off keeps today's behaviour: the current supply target and current measured COP are repeated across the horizon. |
+| Learned curve bin width | 3 °C | 1–10 °C | Outdoor-temperature width of each learned bin. Narrower bins resolve a kinked curve better but need more samples. |
+| Minimum learned curve confidence | 0.6 | 0.3–1 | Confidence a bin needs before it is used. Confidence grows with sample count (full at twice the six-sample minimum) and shrinks with spread inside the bin. |
+| Supplementary heater rated power | 9 kW | 0.1–50 kW | Rated electrical power multiplied by the heater output share when no heater power entity is configured. |
 
 The next-hour demand model is `heat-loss coefficient × max(balance temperature −
 outdoor temperature, 0)`. Tank energy is calculated from the configured effective

@@ -250,9 +250,14 @@ publication does not prevent allocating against those prices with current inputs
 Saved prices and the reservation deadline survive restart.
 
 Each allocation is delivered during a bounded window ending at its price interval
-boundary. Scheduled callbacks update control at window boundaries. New windows
-must satisfy minimum dwell, and observed tank energy protects heat committed to
-later intervals; that budget stop takes priority over dwell in Auto. Manual use
+boundary. Scheduled callbacks update control at window boundaries. Minimum dwell
+is enforced on contiguous release windows rather than single price periods, so
+15-minute market resolution still allows multi-hour releases: consecutive
+allocated periods form one window with any partial release at its front, releases
+too short to realize are dropped (a lone period that can never reach the dwell
+first), and reserve gaps shorter than the dwell drop the smaller release.
+Observed tank energy protects heat committed to later intervals; that budget stop
+takes priority over dwell in Auto. Manual use
 and the independent high-temperature override can consume reserved heat. Dispatch
 still depends on estimated demand and sensor update latency and requires field
 commissioning.
@@ -273,9 +278,21 @@ retry. A successful service call does not establish physical relay confirmation.
 
 Charging power is net tank storage gain. The target includes planned discharge
 before firing begins, including manual/forced use, without adding building demand
-again during firing. Forecast outdoor temperature currently repeats the measured
-outdoor temperature; selecting a weather entity validates availability but does
-not yet apply its hourly forecast. High-grade energy remains diagnostic.
+again during firing. When a weather entity is selected, each forecast interval
+uses the hourly outdoor forecast at its midpoint, corrected toward the measured
+outdoor temperature for the first six hours; otherwise, or when the forecast is
+unavailable or older than 12 hours, the measured outdoor temperature is repeated
+across the horizon. With **Learn temperature-dependent curves** enabled, the
+heat pump's heating curve is learned from the supply-target and outdoor entities
+in bounded outdoor-temperature bins, and each interval's supply target follows
+its own outdoor temperature once enough confident bins exist. A configured
+measured-COP entity additionally teaches COP per outdoor-temperature bin, so each
+interval's avoided heat cost reflects the colder hours' lower COP; a learned
+Carnot efficiency extrapolates below the observed range. With separate heat-pump
+and supplementary-heater electrical power entities, the measured compressor COP
+is combined into the system's effective COP, so hours in which the immersion
+heater runs are valued at their true heat cost. High-grade energy remains
+diagnostic.
 
 Learned values fall back when required evidence disappears or becomes anomalous.
 Maximum evidence ages are one day for COP/building demand, seven days for capacity,

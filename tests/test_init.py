@@ -232,7 +232,7 @@ async def test_removal_clears_all_private_runtime_stores(hass: HomeAssistant) ->
     await hass.async_block_till_done()
     stores = [
         Store[dict[str, object]](hass, 1, f"{DOMAIN}.{entry.entry_id}.{suffix}")
-        for suffix in ("plan", "calibration", "controller", "advisor")
+        for suffix in ("plan", "calibration", "controller", "advisor", "curves")
     ]
     for store in stores:
         await store.async_save({"test": True})

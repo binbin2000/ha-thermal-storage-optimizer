@@ -31,6 +31,8 @@ from .const import (
     CONF_CHARGING_SLOPE_THRESHOLD,
     CONF_COP_MAX,
     CONF_COP_MIN,
+    CONF_CURVE_BIN_WIDTH,
+    CONF_CURVE_MIN_CONFIDENCE,
     CONF_ECONOMIC_DEADBAND,
     CONF_FIXED_COP,
     CONF_FLOW_RATE,
@@ -82,10 +84,14 @@ from .const import (
     CONF_STOVE_EFFICIENCY,
     CONF_STOVE_FLOW_TEMPERATURE,
     CONF_STOVE_TEMPERATURE_THRESHOLD,
+    CONF_SUPPLEMENTARY_HEATER_POWER,
+    CONF_SUPPLEMENTARY_HEATER_RATED_POWER,
+    CONF_SUPPLEMENTARY_HEATER_SHARE,
     CONF_SUPPLY_TARGET,
     CONF_TANK_BOTTOM,
     CONF_TANK_MIDDLE,
     CONF_TANK_TOP,
+    CONF_TEMPERATURE_CURVES,
     CONF_TOP_LAYER_VOLUME,
     CONF_TOTAL_TANK_VOLUME,
     CONF_TREND_DEADBAND,
@@ -108,6 +114,8 @@ from .const import (
     DEFAULT_CHARGING_POWER_MIN,
     DEFAULT_COP_MAX,
     DEFAULT_COP_MIN,
+    DEFAULT_CURVE_BIN_WIDTH,
+    DEFAULT_CURVE_MIN_CONFIDENCE,
     DEFAULT_ECONOMIC_DEADBAND,
     DEFAULT_FIXED_COP,
     DEFAULT_FORECAST_CONFIDENCE,
@@ -129,6 +137,7 @@ from .const import (
     DEFAULT_RESIDUAL_MIN,
     DEFAULT_SENSOR_STALE_AFTER,
     DEFAULT_STARTUP_GRACE_PERIOD,
+    DEFAULT_TEMPERATURE_CURVES,
     DEFAULT_TOTAL_TANK_VOLUME,
     DEFAULT_TREND_DEADBAND,
     DEFAULT_USABLE_CAPACITY,
@@ -181,6 +190,12 @@ ENTITY_SCHEMA = vol.Schema(
         vol.Optional(CONF_STOVE_FLOW_TEMPERATURE): TEMPERATURE_SELECTOR,
         vol.Optional(CONF_FLOW_RATE): _entity_selector(
             domain="sensor", device_class=SensorDeviceClass.VOLUME_FLOW_RATE
+        ),
+        vol.Optional(CONF_SUPPLEMENTARY_HEATER_POWER): _entity_selector(
+            domain="sensor", device_class=SensorDeviceClass.POWER
+        ),
+        vol.Optional(CONF_SUPPLEMENTARY_HEATER_SHARE): _entity_selector(
+            domain="sensor"
         ),
         vol.Optional(CONF_NOTIFICATION_TARGET): _entity_selector(domain="notify"),
     }
@@ -392,6 +407,18 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Required(
             CONF_REPLAN_INTERVAL, default=DEFAULT_REPLAN_INTERVAL
         ): _number_selector(1, 60, 1, "min"),
+        vol.Required(
+            CONF_TEMPERATURE_CURVES, default=DEFAULT_TEMPERATURE_CURVES
+        ): selector.BooleanSelector(),
+        vol.Required(
+            CONF_CURVE_BIN_WIDTH, default=DEFAULT_CURVE_BIN_WIDTH
+        ): _number_selector(1, 10, 0.5, "°C"),
+        vol.Required(
+            CONF_CURVE_MIN_CONFIDENCE, default=DEFAULT_CURVE_MIN_CONFIDENCE
+        ): _number_selector(0.3, 1, 0.01),
+        vol.Optional(CONF_SUPPLEMENTARY_HEATER_RATED_POWER): _number_selector(
+            0.1, 50, 0.1, "kW"
+        ),
         vol.Required(
             CONF_ACTIVE_CONTROL, default=DEFAULT_ACTIVE_CONTROL
         ): selector.BooleanSelector(),

@@ -3,6 +3,43 @@
 All notable changes use [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Hourly outdoor-temperature forecasts from the selected weather entity now drive
+  per-interval heat demand. The forecast is bias-corrected toward the measured
+  outdoor temperature over the first six hours and falls back to the measured value
+  when unavailable, malformed, or stale. Diagnostics and the plan summary report
+  the forecast state and per-interval outdoor temperature.
+- Optional learned heating curve: with **Learn temperature-dependent curves**
+  enabled, the supply target is learned per outdoor-temperature bin from the
+  configured entities and applied per forecast interval. Bins are bounded, aged
+  out after 30 days, exposed on a new **Learned temperature curves** diagnostic
+  entity, persisted across restarts, and cleared by the reset action.
+- Temperature-dependent COP learned from the measured-COP entity per
+  outdoor-temperature bin (sampled only while the heat pump runs when its
+  electrical power is configured). Each forecast interval uses the learned COP for
+  its own forecast outdoor temperature, a learned Carnot efficiency extrapolates
+  beyond the observed range, and the fixed or calibrated value remains the last
+  fallback. The COP source entity gains `learned_curve` and
+  `carnot_extrapolation` states.
+- Optional supplementary electric heater inputs (electrical power, or output
+  share with a rated power option). With the heat-pump electrical power and the
+  measured COP, the planner uses the system's effective COP, learns the heater's
+  heat share per outdoor-temperature bin, reports the learned balance point in
+  diagnostics, and exposes the current heater heat share as a diagnostic sensor.
+
+### Fixed
+
+- Minimum output dwell now applies to contiguous release windows instead of
+  each price period. With 15-minute market resolution and the default 30-minute
+  dwell, every period was shorter than the dwell and no tank energy was ever
+  allocated. A chain of consecutive periods is now laid out as one window with
+  the partial release at its front, a lone period that can never reach the dwell
+  yields its energy to a broad peak, and reserve gaps shorter than the dwell
+  drop the smaller release.
+
 ## [1.0.0] - 2026-09-08
 
 ### Added

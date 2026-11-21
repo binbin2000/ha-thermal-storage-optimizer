@@ -38,9 +38,13 @@ async def async_setup_actions(entry: ThermalStorageOptimizerConfigEntry) -> None
         await entry.runtime_data.async_reset_calibration()
         return {
             "reset": True,
-            "reset_items": list(entry.runtime_data.calibration.parameters),
+            "reset_items": [
+                *entry.runtime_data.calibration.parameters,
+                *entry.runtime_data.curves.curves,
+            ],
             "message": (
-                "Adaptive calibration reset; deterministic configuration retained."
+                "Adaptive calibration and learned temperature curves reset; "
+                "deterministic configuration retained."
             ),
         }
 

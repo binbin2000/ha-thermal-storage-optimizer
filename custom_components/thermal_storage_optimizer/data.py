@@ -45,6 +45,7 @@ class RuntimeSnapshot:
     plan_reason: str = "Waiting for a valid timestamped price forecast"
     recommendation: Recommendation | None = None
     forecast_rejected_items: int = 0
+    supplementary_heat_share: float | None = None
 
     @property
     def captured_at(self) -> datetime:

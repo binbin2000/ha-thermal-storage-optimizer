@@ -19,6 +19,7 @@ class InputKind(StrEnum):
     ENERGY = "energy"
     COP = "cop"
     FLOW_RATE = "flow_rate"
+    PERCENTAGE = "percentage"
     AVAILABILITY = "availability"
     DIGITAL = "digital"
 
@@ -110,6 +111,7 @@ _CANONICAL_UNITS: Final = {
     InputKind.ENERGY: "kWh",
     InputKind.COP: None,
     InputKind.FLOW_RATE: "L/min",
+    InputKind.PERCENTAGE: "%",
 }
 
 
@@ -206,13 +208,20 @@ def _issue(raw: RawInput, problem: InputProblem) -> InputIssue:
     return InputIssue(raw.key, raw.entity_id, problem, raw.required)
 
 
+def convert_temperature_to_celsius(value: float, unit: str | None) -> float | None:
+    """Convert a temperature with explicit unit metadata; reject unknown units."""
+    converter = _TEMPERATURE_FACTORS.get(unit.strip().lower() if unit else "")
+    return converter(value) if converter is not None else None
+
+
 def _convert_value(kind: InputKind, value: float, unit: str | None) -> float | None:
     normalized_unit = unit.strip().lower() if unit is not None else None
     if kind is InputKind.COP:
         return value if normalized_unit in {None, "", "cop"} and value > 0 else None
     if kind is InputKind.TEMPERATURE:
-        converter = _TEMPERATURE_FACTORS.get(normalized_unit or "")
-        return converter(value) if converter is not None else None
+        return convert_temperature_to_celsius(value, unit)
+    if kind is InputKind.PERCENTAGE:
+        return value if normalized_unit == "%" and 0 <= value <= 100 else None  # noqa: PLR2004
     if kind is InputKind.POWER:
         factor = _POWER_FACTORS.get(normalized_unit or "")
     elif kind is InputKind.ENERGY:

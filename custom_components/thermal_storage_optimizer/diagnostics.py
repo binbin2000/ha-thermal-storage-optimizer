@@ -43,6 +43,7 @@ async def async_get_config_entry_diagnostics(
     cop = data.cop
     advisor = coordinator.advisor.state
     controller = coordinator.controller
+    outdoor_forecast = coordinator.adapter.outdoor_forecast
     performance = coordinator.calibration.performance_report(
         data.plan.expected_savings if data.plan is not None else None
     )
@@ -79,8 +80,38 @@ async def async_get_config_entry_diagnostics(
             "cop": cop.value if cop is not None else None,
             "cop_source": cop.source.value if cop is not None else None,
             "cop_confidence": cop.confidence if cop is not None else None,
+            "supplementary_heat_share": data.supplementary_heat_share,
+        },
+        "outdoor_forecast": {
+            "configured": coordinator.adapter.weather_entity_id is not None,
+            "available": outdoor_forecast is not None,
+            "fresh": (
+                outdoor_forecast.is_fresh(data.captured_at)
+                if outdoor_forecast is not None
+                else False
+            ),
+            "point_count": (
+                len(outdoor_forecast.points) if outdoor_forecast is not None else 0
+            ),
+            "fetched_at": (
+                outdoor_forecast.fetched_at.isoformat()
+                if outdoor_forecast is not None
+                else None
+            ),
+            "first_at": (
+                outdoor_forecast.first_at.isoformat()
+                if outdoor_forecast is not None
+                else None
+            ),
+            "last_at": (
+                outdoor_forecast.last_at.isoformat()
+                if outdoor_forecast is not None
+                else None
+            ),
+            "error": coordinator.adapter.outdoor_forecast_error,
         },
         "adaptive_calibration": coordinator.calibration.diagnostics(),
+        "temperature_curves": coordinator.curves.diagnostics(data.captured_at),
         "performance_validation": {
             "comparison_samples": performance.comparison_samples,
             "modeled_heat_kwh": performance.modeled_heat_kwh,

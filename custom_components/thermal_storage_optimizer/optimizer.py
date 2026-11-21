@@ -6,6 +6,7 @@ import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
+from itertools import pairwise
 from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
@@ -119,7 +120,7 @@ class OptimizationPlan:
         return "No priced current interval; preserve the saved allocation"
 
 
-def optimize_plan(  # noqa: C901, PLR0913
+def optimize_plan(  # noqa: PLR0913
     intervals: tuple[EconomicForecastInterval, ...],
     *,
     publication_key: str,
@@ -161,39 +162,35 @@ def optimize_plan(  # noqa: C901, PLR0913
         )
     ]
     eligible.sort(key=lambda item: (-item[1].adjusted_value_per_kwh, item[1].start))
-    remaining = available_energy_kwh
-    allocations = [0.0] * len(intervals)
-    for index, period in eligible:
-        allocation = min(remaining * period.retention, period.heat_demand_kwh)
-        release_seconds = (
-            period.duration.total_seconds() * allocation / period.heat_demand_kwh
-            if period.heat_demand_kwh > 0
-            else 0
+    continuing_index = next(
+        (
+            index
+            for index, period in enumerate(intervals)
+            if current_release_active and period.start <= optimized_at < period.end
+        ),
+        None,
+    )
+    # Minimum dwell applies to contiguous release runs, not single price periods:
+    # 15-minute market resolution must still allow a two-hour release. Periods
+    # that cannot be realized are excluded and the allocation is repeated until
+    # every remaining run is deliverable through the binary actuator.
+    excluded: set[int] = set()
+    eligible_indices = {index for index, _ in eligible}
+    while True:
+        allocations, remaining = _allocate(
+            intervals, eligible, available_energy_kwh, excluded
         )
-        continuing = (
-            current_release_active and period.start <= optimized_at < period.end
+        _repair_chains(intervals, allocations, minimum_dwell_seconds, continuing_index)
+        unrealizable = _unrealizable_periods(
+            intervals,
+            allocations,
+            minimum_dwell_seconds,
+            continuing_index,
+            candidates=eligible_indices - excluded,
         )
-        if release_seconds < minimum_dwell_seconds and not continuing:
-            continue
-        allocations[index] = allocation
-        remaining -= allocation / period.retention
-        if remaining <= _REMAINING_EPSILON:
+        if not unrealizable:
             break
-    # Separate non-contiguous releases by at least the actuator's reserve dwell.
-    next_start: datetime | None = None
-    for index in range(len(intervals) - 1, -1, -1):
-        period = intervals[index]
-        if allocations[index] <= _ALLOCATION_EPSILON:
-            continue
-        release = PlannedInterval(period, allocations[index], 0)
-        if (
-            next_start is not None
-            and 0 < (next_start - period.end).total_seconds() < minimum_dwell_seconds
-        ):
-            remaining += allocations[index] / period.retention
-            allocations[index] = 0
-        else:
-            next_start = release.release_start
+        excluded.update(unrealizable)
     planned = tuple(
         PlannedInterval(
             period,
@@ -212,3 +209,264 @@ def optimize_plan(  # noqa: C901, PLR0913
         intervals=planned,
         reserve_until=reserve_until,
     )
+
+
+def _allocate(
+    intervals: tuple[EconomicForecastInterval, ...],
+    eligible: list[tuple[int, EconomicForecastInterval]],
+    available_energy_kwh: float,
+    excluded: set[int],
+) -> tuple[list[float], float]:
+    """Greedily fill the highest-value periods that remain allowed."""
+    remaining = available_energy_kwh
+    allocations = [0.0] * len(intervals)
+    for index, period in eligible:
+        if index in excluded:
+            continue
+        allocation = min(remaining * period.retention, period.heat_demand_kwh)
+        if allocation <= _ALLOCATION_EPSILON:
+            continue
+        allocations[index] = allocation
+        remaining -= allocation / period.retention
+        if remaining <= _REMAINING_EPSILON:
+            break
+    return allocations, remaining
+
+
+def _release_seconds(period: EconomicForecastInterval, allocation: float) -> float:
+    return (
+        period.duration.total_seconds() * min(allocation / period.heat_demand_kwh, 1)
+        if period.heat_demand_kwh > 0
+        else 0.0
+    )
+
+
+def _chains(
+    intervals: tuple[EconomicForecastInterval, ...], allocations: list[float]
+) -> list[list[int]]:
+    """Group allocated periods that follow each other without a time gap."""
+    chains: list[list[int]] = []
+    for index, allocation in enumerate(allocations):
+        if allocation <= _ALLOCATION_EPSILON:
+            continue
+        if (
+            chains
+            and intervals[index].start.timestamp()
+            == intervals[chains[-1][-1]].end.timestamp()
+        ):
+            chains[-1].append(index)
+        else:
+            chains.append([index])
+    return chains
+
+
+def _runs(
+    intervals: tuple[EconomicForecastInterval, ...],
+    allocations: list[float],
+    chain: list[int],
+) -> list[list[int]]:
+    """Split a chain into runs whose binary release windows touch.
+
+    Partial releases are end-aligned, so only the first period of a run may be
+    partially allocated; a later partial period starts a new run after a gap.
+    """
+    runs: list[list[int]] = [[chain[0]]]
+    for index in chain[1:]:
+        period = intervals[index]
+        if allocations[index] >= period.heat_demand_kwh - _ALLOCATION_EPSILON:
+            runs[-1].append(index)
+        else:
+            runs.append([index])
+    return runs
+
+
+def _run_seconds(
+    intervals: tuple[EconomicForecastInterval, ...],
+    allocations: list[float],
+    run: list[int],
+) -> float:
+    return sum(_release_seconds(intervals[i], allocations[i]) for i in run)
+
+
+def _gap_seconds(
+    intervals: tuple[EconomicForecastInterval, ...],
+    allocations: list[float],
+    run: list[int],
+    next_run: list[int],
+) -> float:
+    """Return the reserve time between one run's end and the next release."""
+    next_release = PlannedInterval(
+        intervals[next_run[0]], allocations[next_run[0]], 0
+    ).release_start
+    return (next_release - intervals[run[-1]].end).total_seconds()
+
+
+def _gap_victim(  # noqa: PLR0913, PLR0917
+    intervals: tuple[EconomicForecastInterval, ...],
+    allocations: list[float],
+    run: list[int],
+    next_run: list[int],
+    minimum_dwell_seconds: float,
+    continuing_index: int | None,
+) -> list[int] | None:
+    """Return the run to give up when the reserve gap between two is too short."""
+    gap = _gap_seconds(intervals, allocations, run, next_run)
+    if not 0 < gap < minimum_dwell_seconds:
+        return None
+    if continuing_index in run:
+        return next_run
+    if continuing_index in next_run:
+        return run
+    return min(
+        (run, next_run), key=lambda item: _run_seconds(intervals, allocations, item)
+    )
+
+
+def _violating_runs(
+    intervals: tuple[EconomicForecastInterval, ...],
+    allocations: list[float],
+    runs: list[list[int]],
+    minimum_dwell_seconds: float,
+    continuing_index: int | None,
+) -> list[list[int]]:
+    """Return runs that are too short, or the smaller side of a too-short gap."""
+    violating: list[list[int]] = [
+        run
+        for run in runs
+        if _run_seconds(intervals, allocations, run) < minimum_dwell_seconds
+        and continuing_index not in run
+    ]
+    for run, next_run in pairwise(runs):
+        victim = _gap_victim(
+            intervals,
+            allocations,
+            run,
+            next_run,
+            minimum_dwell_seconds,
+            continuing_index,
+        )
+        if victim is not None and victim not in violating:
+            violating.append(victim)
+    return violating
+
+
+def _repair_chains(
+    intervals: tuple[EconomicForecastInterval, ...],
+    allocations: list[float],
+    minimum_dwell_seconds: float,
+    continuing_index: int | None,
+) -> None:
+    """Re-lay a chain into one contiguous window when that beats dropping runs.
+
+    The greedy fill leaves its partial period at the chain's lowest-value end,
+    which can split the chain into a run and a short tail. Laying the chain's
+    stored energy out from its last period backwards puts the partial release
+    at the front, where it touches the following full periods. A chain holding
+    the release already in progress is laid out forwards so it is never cut.
+    The re-lay is applied only when it removes every violation in the chain and
+    keeps at least the value that dropping the violating runs would keep.
+    """
+    for chain in _chains(intervals, allocations):
+        runs = _runs(intervals, allocations, chain)
+        violating = _violating_runs(
+            intervals, allocations, runs, minimum_dwell_seconds, continuing_index
+        )
+        if not violating:
+            continue
+        relaid = list(allocations)
+        stored = sum(relaid[i] / intervals[i].retention for i in chain)
+        order = chain if continuing_index in chain else list(reversed(chain))
+        for index in order:
+            period = intervals[index]
+            allocation = min(period.heat_demand_kwh, stored * period.retention)
+            relaid[index] = allocation if allocation > _ALLOCATION_EPSILON else 0.0
+            stored = max(stored - relaid[index] / period.retention, 0.0)
+        relaid_chain = [i for i in chain if relaid[i] > _ALLOCATION_EPSILON]
+        if not relaid_chain or _violating_runs(
+            intervals,
+            relaid,
+            _runs(intervals, relaid, relaid_chain),
+            minimum_dwell_seconds,
+            continuing_index,
+        ):
+            continue
+        dropped = {i for run in violating for i in run}
+        kept_value = sum(
+            allocations[i] * intervals[i].adjusted_value_per_kwh
+            for i in chain
+            if i not in dropped
+        )
+        relaid_value = sum(
+            relaid[i] * intervals[i].adjusted_value_per_kwh for i in chain
+        )
+        if relaid_value >= kept_value - _ALLOCATION_EPSILON:
+            for index in chain:
+                allocations[index] = relaid[index]
+
+
+def _unrealizable_periods(
+    intervals: tuple[EconomicForecastInterval, ...],
+    allocations: list[float],
+    minimum_dwell_seconds: float,
+    continuing_index: int | None,
+    *,
+    candidates: set[int],
+) -> set[int]:
+    """Return the next allocated periods whose release cannot honour the dwell.
+
+    Only one run is dropped per call, because freeing its energy often lengthens
+    another run. Runs whose whole block of consecutive eligible periods could
+    never reach the dwell are dropped first, then the shortest release, so a
+    lone high-priced quarter hour yields to a broad peak rather than starving it.
+    """
+    violating: list[list[int]] = []
+    for chain in _chains(intervals, allocations):
+        violating.extend(
+            _violating_runs(
+                intervals,
+                allocations,
+                _runs(intervals, allocations, chain),
+                minimum_dwell_seconds,
+                continuing_index,
+            )
+        )
+    for chain, next_chain in pairwise(_chains(intervals, allocations)):
+        victim = _gap_victim(
+            intervals,
+            allocations,
+            _runs(intervals, allocations, chain)[-1],
+            _runs(intervals, allocations, next_chain)[0],
+            minimum_dwell_seconds,
+            continuing_index,
+        )
+        if victim is not None and victim not in violating:
+            violating.append(victim)
+    if not violating:
+        return set()
+
+    def block_potential(run: list[int]) -> float:
+        """Return the release time the run's eligible block could ever reach."""
+        first, last = run[0], run[-1]
+        while first - 1 in candidates and (
+            intervals[first - 1].end.timestamp() == intervals[first].start.timestamp()
+        ):
+            first -= 1
+        while last + 1 in candidates and (
+            intervals[last + 1].start.timestamp() == intervals[last].end.timestamp()
+        ):
+            last += 1
+        return sum(
+            intervals[i].duration.total_seconds()
+            for i in range(first, last + 1)
+            if intervals[i].heat_demand_kwh > 0
+        )
+
+    chosen = min(
+        violating,
+        key=lambda run: (
+            block_potential(run) >= minimum_dwell_seconds,
+            _run_seconds(intervals, allocations, run),
+            run[0],
+        ),
+    )
+    return set(chosen)
