@@ -5,6 +5,8 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-22
+
 ### Added
 
 - Bundled `custom:thermal-storage-day-chart-card` dashboard card showing today

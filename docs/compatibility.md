@@ -1,6 +1,6 @@
 # Compatibility
 
-Version 1.0.0 is tested against:
+Versions 1.0.0 and 1.1.0 are tested against:
 
 - Home Assistant Core 2026.9.1
 - Python 3.14.2 (the runtime used by that tested Home Assistant release)
@@ -19,7 +19,7 @@ entity units, output-domain turn-on/turn-off services, and notification behavior
 be verified at each installation.
 
 Config-entry schema versions 1 through 6 are upgrade inputs supported by version
-1.0.0. Downgrade compatibility is not guaranteed because Home Assistant blocks unknown
+1.0.0 and 1.1.0. Downgrade compatibility is not guaranteed because Home Assistant blocks unknown
 newer major schemas and persisted state may evolve. Restore the matching Home Assistant
 backup and integration version for rollback.
 

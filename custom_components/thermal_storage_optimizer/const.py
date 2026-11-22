@@ -7,7 +7,7 @@ from homeassistant.const import UnitOfTime
 DOMAIN: Final = "thermal_storage_optimizer"
 INTEGRATION_NAME: Final = "Thermal Storage Optimizer"
 DEVICE_MODEL: Final = "Supervisory optimizer"
-VERSION: Final = "1.0.0"
+VERSION: Final = "1.1.0"
 CONFIG_ENTRY_VERSION: Final = 6
 CONFIG_ENTRY_MINOR_VERSION: Final = 1
 UNIQUE_ID: Final = DOMAIN
