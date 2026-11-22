@@ -134,7 +134,8 @@
           "curve_bin_width_c": "Learned curve bin width (°C outdoor)",
           "curve_min_confidence": "Minimum learned curve confidence",
           "supplementary_heater_rated_power_kw": "Supplementary heater rated power (used with the share entity)",
-          "firing_detection_mode": "Stove firing detection"
+          "firing_detection_mode": "Stove firing detection",
+          "output_acknowledgement_timeout_s": "Output acknowledgement timeout"
         },
         "data_description": {
           "sensor_stale_after": "Maximum age for temperature and optional measurement updates.",

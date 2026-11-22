@@ -38,6 +38,11 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- An unacknowledged output command no longer latches a fault until a mode is
+  selected. The controller still requests OFF and shows fault fallback, but now
+  retries after 1 minute, 5 minutes, and then every 15 minutes, and clears the
+  fault when a command is acknowledged. The reason shows the attempt number and
+  next retry time. The acknowledgement timeout is a new option (default 30 s).
 - Adaptive calibration now learns stove sessions from the advisor's firing
   detection, so a rising tank-energy estimate and a manual start count as firing.
   Previously only the charging pump and stove-flow temperature did, and an

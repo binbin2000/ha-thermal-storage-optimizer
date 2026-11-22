@@ -97,6 +97,13 @@ The condensed safety checks below remain mandatory.
     remaining-time sensor. Treat lowered confidence from simultaneous discharge
     or noisy sensors conservatively until placement and thresholds are verified.
 
+If the output entity does not show a commanded state within the acknowledgement
+timeout, the controller exposes `FAULT_FALLBACK`, requests OFF, and retries the
+command automatically after 1 minute, then 5 minutes, then every 15 minutes. The
+growing delay keeps a conflicting controller of the same entity from making the
+relay chatter. The fault reason shows the attempt number and next retry time, and
+it clears when a command is acknowledged. Selecting a mode retries at once.
+
 If an output service call fails, the controller exposes `FAULT_FALLBACK`, logs
 the failure, and makes a best-effort OFF request. A failed OFF call can mean the
 physical state is unknown; treat that as an installation fault and rely on the

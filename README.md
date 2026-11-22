@@ -283,10 +283,11 @@ charged through each interval's end. Retained energy is expressed as an equivale
 at the optimization timestamp.
 
 Output-active reports the observed entity state (unknown when unavailable).
-Commands have a 30-second acknowledgement allowance, checked on subsequent input
-or timer evaluation (normally within one minute). Persistent disagreement raises
-a latched fault and requests OFF. After investigating, select a mode again to
-retry. A successful service call does not establish physical relay confirmation.
+Commands have a configurable acknowledgement allowance (30 seconds by default),
+checked on subsequent input or timer evaluation (normally within one minute).
+Disagreement raises a visible fault, requests OFF, and retries automatically
+after 1, 5, and then every 15 minutes until a command is acknowledged. Selecting
+a mode retries at once. A successful service call does not establish physical relay confirmation.
 
 Charging power is net tank storage gain. The target includes planned discharge
 before firing begins, including manual/forced use, without adding building demand

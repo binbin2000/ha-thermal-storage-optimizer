@@ -14,12 +14,14 @@ from typing import TYPE_CHECKING, Final
 from homeassistant.const import ATTR_ENTITY_ID, SERVICE_TURN_OFF, SERVICE_TURN_ON
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_ACTIVE_CONTROL,
     CONF_HIGH_TEMPERATURE_HYSTERESIS,
     CONF_HIGH_TEMPERATURE_THRESHOLD,
     CONF_MINIMUM_DWELL_TIME,
+    CONF_OUTPUT_ACK_TIMEOUT,
     CONF_OUTPUT_INVERTED,
     CONF_RESERVE_OUTPUT,
     CONF_STARTUP_GRACE_PERIOD,
@@ -30,9 +32,11 @@ from .const import (
     DEFAULT_HIGH_TEMPERATURE_HYSTERESIS,
     DEFAULT_HIGH_TEMPERATURE_THRESHOLD,
     DEFAULT_MINIMUM_DWELL_TIME,
+    DEFAULT_OUTPUT_ACK_TIMEOUT,
     DEFAULT_OUTPUT_INVERTED,
     DEFAULT_STARTUP_GRACE_PERIOD,
     DOMAIN,
+    OUTPUT_RETRY_DELAYS_S,
 )
 from .data import PlanStatus
 from .optimizer import Recommendation
@@ -81,6 +85,7 @@ class ControllerConfig:
     high_temperature_hysteresis_c: float = DEFAULT_HIGH_TEMPERATURE_HYSTERESIS
     startup_grace: timedelta = timedelta(seconds=DEFAULT_STARTUP_GRACE_PERIOD)
     minimum_dwell: timedelta = timedelta(seconds=DEFAULT_MINIMUM_DWELL_TIME)
+    acknowledgement_timeout: timedelta = timedelta(seconds=DEFAULT_OUTPUT_ACK_TIMEOUT)
 
 
 @dataclass(frozen=True, slots=True)
@@ -355,6 +360,13 @@ class SupervisoryController:
                     )
                 )
             ),
+            acknowledgement_timeout=timedelta(
+                seconds=float(
+                    str(
+                        options.get(CONF_OUTPUT_ACK_TIMEOUT, DEFAULT_OUTPUT_ACK_TIMEOUT)
+                    )
+                )
+            ),
         )
         self.mode = UserMode.AUTO
         self.decision = ControllerDecision(
@@ -369,6 +381,9 @@ class SupervisoryController:
         self._machine: ControllerStateMachine | None = None
         self._service_fault: str | None = None
         self._acknowledgement_fault = False
+        self._acknowledgement_failures = 0
+        self._acknowledgement_reason = ""
+        self._retry_at: datetime | None = None
         self._has_valid_plan = False
         self._listeners: set[Callable[[], None]] = set()
         self._lock = asyncio.Lock()
@@ -407,6 +422,17 @@ class SupervisoryController:
                     PlanStatus.SAVED_PLAN,
                 }
                 self._has_valid_plan = self._has_valid_plan or plan_valid
+                if (
+                    self._acknowledgement_fault
+                    and self._retry_at is not None
+                    and data.captured_at >= self._retry_at
+                ):
+                    # Bounded automatic retry: release the fault so this
+                    # evaluation commands the output again. The failure count
+                    # is kept until a command is acknowledged.
+                    self._acknowledgement_fault = False
+                    self._service_fault = None
+                    self._retry_at = None
                 item = ControllerInput(
                     now=data.captured_at,
                     mode=self.mode,
@@ -434,6 +460,8 @@ class SupervisoryController:
         """Persist a user mode and evaluate it immediately."""
         self.mode = mode
         self._acknowledgement_fault = False
+        self._acknowledgement_failures = 0
+        self._retry_at = None
         self._service_fault = None
         await self._store.async_save({"mode": mode.value})
         await self.async_evaluate()
@@ -492,13 +520,12 @@ class SupervisoryController:
             if self.output_active == requested:
                 self._pending_output = None
             elif requested == decision.output_on and not force_safe_transition:
-                if self._now() - sent_at < timedelta(seconds=30):
+                if self._now() - sent_at < self.config.acknowledgement_timeout:
                     self._set_decision(decision)
                     return
-                self._acknowledgement_fault = True
-                await self.async_handle_fault(
-                    "output acknowledgement timed out; observed state disagrees"
-                )
+                if not self._acknowledgement_fault:
+                    self._schedule_acknowledgement_retry()
+                await self.async_handle_fault(self._acknowledgement_reason)
                 return
         if decision.output_on != self.output_active or force_safe_transition:
             try:
@@ -522,7 +549,31 @@ class SupervisoryController:
                 return
         if not self._acknowledgement_fault:
             self._service_fault = None
+            if (
+                self._pending_output is None
+                and decision.output_on == self.output_active
+            ):
+                # The commanded state is confirmed by the entity.
+                self._acknowledgement_failures = 0
         self._set_decision(decision)
+
+    def _schedule_acknowledgement_retry(self) -> None:
+        """Latch an acknowledgement fault with a bounded, growing retry delay.
+
+        The output stays OFF between attempts. The delay grows with repeated
+        failures so a conflicting controller of the same entity cannot make
+        the relay chatter, and the fault remains visible until a command is
+        acknowledged or the user selects a mode.
+        """
+        self._acknowledgement_failures += 1
+        index = min(self._acknowledgement_failures, len(OUTPUT_RETRY_DELAYS_S)) - 1
+        self._retry_at = self._now() + timedelta(seconds=OUTPUT_RETRY_DELAYS_S[index])
+        self._acknowledgement_fault = True
+        retry_clock = dt_util.as_local(self._retry_at).strftime("%H:%M")
+        self._acknowledgement_reason = (
+            "output acknowledgement timed out; observed state disagrees "
+            f"(attempt {self._acknowledgement_failures}); retrying at {retry_clock}"
+        )
 
     async def _async_call_output(self, *, turn_on: bool, force: bool = False) -> None:
         """Use the entity domain's async turn-on/turn-off service API."""
@@ -589,8 +640,6 @@ class SupervisoryController:
         """Use snapshot time when available so tests share the controller clock."""
         if self.coordinator.data is not None:
             return self.coordinator.data.captured_at
-        from homeassistant.util import dt as dt_util  # noqa: PLC0415
-
         return dt_util.utcnow()
 
 
