@@ -341,13 +341,23 @@ class ChargingAdvisor:
             if period.forecast.adjusted_value_per_kwh > 0
             and period.forecast.adjusted_value_per_kwh >= baseline + deadband
         ]
+        usable_capacity = self.coordinator.calibration.value(
+            "usable_capacity_kwh",
+            self._option(CONF_USABLE_CAPACITY, DEFAULT_USABLE_CAPACITY),
+        )
+        completion, valuable = _firing_deadline(
+            valuable,
+            now,
+            capacity_kwh=usable_capacity,
+            minimum_lead=timedelta(
+                minutes=self._option(
+                    CONF_MINIMUM_FIRING_DURATION, DEFAULT_MINIMUM_FIRING_DURATION
+                )
+            ),
+            horizon_end=plan.forecast_end,
+        )
+        completion = dt_util.as_local(completion)
         high_demand = sum(period.forecast.heat_demand_kwh for period in valuable)
-        if valuable:
-            completion = dt_util.as_local(
-                min(valuable, key=lambda period: period.forecast.start).forecast.start
-            )
-        else:
-            completion = dt_util.as_local(plan.forecast_end)
         storage_losses = sum(
             period.forecast.heat_demand_kwh
             * max(1 / max(period.forecast.retention, 1e-6) - 1, 0)
@@ -411,10 +421,7 @@ class ChargingAdvisor:
                 intervening_discharge_kwh=min(intervening, current),
                 firing_session_heat_use_kwh=0,
                 storage_losses_kwh=storage_losses,
-                usable_capacity_kwh=self.coordinator.calibration.value(
-                    "usable_capacity_kwh",
-                    self._option(CONF_USABLE_CAPACITY, DEFAULT_USABLE_CAPACITY),
-                ),
+                usable_capacity_kwh=usable_capacity,
                 layer_temperatures_c=temperatures,
                 layer_volumes_l=(
                     self._option(CONF_TOP_LAYER_VOLUME, DEFAULT_LAYER_VOLUME),
@@ -973,6 +980,55 @@ class ChargingAdvisor:
             if normalized is not None and isinstance(normalized.value, bool)
             else None
         )
+
+
+def _firing_deadline(
+    valuable: list[PlannedInterval],
+    now: datetime,
+    *,
+    capacity_kwh: float,
+    minimum_lead: timedelta,
+    horizon_end: datetime,
+) -> tuple[datetime, list[PlannedInterval]]:
+    """Return when a firing session should be complete and what it serves.
+
+    A full tank can only cover a limited amount of heat demand, so the
+    session targets the most valuable periods that one tank load can serve:
+    they are taken in descending value until their demand fills the usable
+    capacity. The session must be complete before the earliest of those that
+    still lies far enough ahead to be reachable. Valuable periods before that
+    deadline are left to the energy already stored, so a price peak later in
+    the horizon is not skipped merely because cheaper valuable periods are
+    already in progress.
+    """
+    ranked = sorted(
+        valuable,
+        key=lambda period: (
+            -period.forecast.adjusted_value_per_kwh,
+            period.forecast.start,
+        ),
+    )
+    reachable = now + minimum_lead
+    selected: list[PlannedInterval] = []
+    covered = 0.0
+    for period in ranked:
+        if period.forecast.start < reachable:
+            continue
+        if selected and covered >= capacity_kwh:
+            break
+        selected.append(period)
+        covered += period.forecast.heat_demand_kwh
+    if not selected:
+        if valuable:
+            return min(period.forecast.start for period in valuable), valuable
+        return horizon_end, valuable
+    deadline = min(period.forecast.start for period in selected)
+    served = [
+        period
+        for period in valuable
+        if period.forecast.start.timestamp() >= deadline.timestamp()
+    ]
+    return deadline, served
 
 
 def _dispatch_discharge(
