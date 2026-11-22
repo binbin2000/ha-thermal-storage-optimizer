@@ -1,14 +1,24 @@
 name: Release
 
-# Two ways to publish the version declared in the repository:
-#   - Run this workflow manually from the default branch. It validates the
-#     code, then creates the v<version> tag and the GitHub release itself.
-#   - Push an annotated v<version> tag. The release is created for that tag.
+# A release with one button: Actions → Release → Run workflow (docs/release-process.md).
+# Raises the version in pyproject.toml, manifest.json and const.py, dates the
+# [Unreleased] changelog section, writes docs/release-notes-<version>.md (unless it
+# already exists), runs the quality checks, builds the manual-installation package,
+# pushes "Release X.Y.Z" to the default branch and creates the GitHub release
+# v<version>. Everything happens in this one run, because a push made with
+# GITHUB_TOKEN does not start CI.
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*.*.*"
+    inputs:
+      bump:
+        description: "Which part of the version to raise"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      version:
+        description: "Or an exact version (X.Y.Z); overrides the choice above"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -20,45 +30,40 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - name: Require the default branch for a manual release
-        if: github.event_name == 'workflow_dispatch'
+      - name: Only from the default branch
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           if [ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
-            echo "::error::Run the release workflow from $DEFAULT_BRANCH, not $GITHUB_REF_NAME."
+            echo "::error::Run the Release workflow from $DEFAULT_BRANCH, not $GITHUB_REF_NAME."
             exit 1
           fi
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14.2"
           cache: pip
       - name: Install pinned development dependencies
         run: python -m pip install -e ".[dev]"
-      - name: Resolve release tag
+      - name: Raise the version
         id: version
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          HOW: ${{ inputs.version != '' && inputs.version || inputs.bump }}
         run: |
-          version="$(python -c 'from scripts.build_release import release_version; print(release_version())')"
+          version="$(python -m scripts.bump_version "$HOW")"
           tag="v$version"
-          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF_NAME" != "$tag" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match the declared version $version."
-            exit 1
-          fi
-          if [ ! -f "docs/release-notes-$version.md" ]; then
-            echo "::error::docs/release-notes-$version.md is missing."
+          if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+            echo "::error::Tag $tag already exists."
             exit 1
           fi
           if gh release view "$tag" > /dev/null 2>&1; then
-            echo "::error::Release $tag already exists. Bump the version before releasing again."
-            exit 1
-          fi
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] &&
-            [ -n "$(git ls-remote --tags origin "refs/tags/$tag")" ]; then
-            echo "::error::Tag $tag already exists. Bump the version before releasing again."
+            echo "::error::Release $tag already exists."
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -70,20 +75,28 @@ jobs:
           python -m ruff check .
           python -m mypy
           python scripts/build_release.py --check
+      - name: Commit the version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml CHANGELOG.md \
+            custom_components/thermal_storage_optimizer/manifest.json \
+            custom_components/thermal_storage_optimizer/const.py \
+            "docs/release-notes-$VERSION.md"
+          git commit -q -m "Release $VERSION"
       - name: Build package
         run: python scripts/build_release.py
-      - name: Create GitHub release
+      - name: Push and release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          # A manual run has no tag yet, so the release creates it at this commit.
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            tag_option=(--target "$GITHUB_SHA")
-          else
-            tag_option=(--verify-tag)
-          fi
-          gh release create "$TAG" dist/*.zip "${tag_option[@]}" \
+          git push origin "HEAD:$DEFAULT_BRANCH"
+          gh release create "$TAG" dist/*.zip \
+            --target "$(git rev-parse HEAD)" \
             --title "Thermal Storage Optimizer $TAG" \
             --notes-file "docs/release-notes-$VERSION.md"
