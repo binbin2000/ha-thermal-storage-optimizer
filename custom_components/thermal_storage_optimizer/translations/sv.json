@@ -133,7 +133,8 @@
           "temperature_curves_enabled": "Lär in temperaturberoende kurvor (värmekurva och COP)",
           "curve_bin_width_c": "Binbredd för inlärda kurvor (°C ute)",
           "curve_min_confidence": "Lägsta konfidens för inlärda kurvor",
-          "supplementary_heater_rated_power_kw": "Elpatronens nominella effekt (används med procententiteten)"
+          "supplementary_heater_rated_power_kw": "Elpatronens nominella effekt (används med procententiteten)",
+          "firing_detection_mode": "Detektering av kamineldning"
         },
         "data_description": {
           "sensor_stale_after": "Högsta ålder för temperaturer och valfria mätvärden.",
@@ -387,6 +388,14 @@
     "reset_learned_state": {
       "name": "Återställ inlärt tillstånd",
       "description": "Återställ begränsad adaptiv kalibrering men behåll deterministiska inställningar, planer, lägen och säkerhetstillstånd."
+    }
+  },
+  "selector": {
+    "firing_detection_mode": {
+      "options": {
+        "all_signals": "Alla signaler (pump, kamintemperatur, energiökning i tanken, manuell start)",
+        "energy_slope": "Enbart energiökning i tanken (samt manuell start)"
+      }
     }
   }
 }

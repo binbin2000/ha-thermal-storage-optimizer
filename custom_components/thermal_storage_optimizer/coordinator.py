@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import math
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Final
@@ -64,9 +63,6 @@ from .const import (
     CONF_RESIDUAL_MAX,
     CONF_RESIDUAL_MIN,
     CONF_RETURN_TEMPERATURE,
-    CONF_STOVE_CHARGING_PUMP,
-    CONF_STOVE_FLOW_TEMPERATURE,
-    CONF_STOVE_TEMPERATURE_THRESHOLD,
     CONF_SUPPLEMENTARY_HEATER_POWER,
     CONF_SUPPLEMENTARY_HEATER_RATED_POWER,
     CONF_SUPPLEMENTARY_HEATER_SHARE,
@@ -108,7 +104,6 @@ from .const import (
     DEFAULT_RESIDUAL_BURN_ENERGY,
     DEFAULT_RESIDUAL_MAX,
     DEFAULT_RESIDUAL_MIN,
-    DEFAULT_STOVE_TEMPERATURE_THRESHOLD,
     DEFAULT_SUPPLEMENTARY_HEATER_RATED_POWER,
     DEFAULT_TEMPERATURE_CURVES,
     DEFAULT_TOTAL_TANK_VOLUME,
@@ -441,8 +436,8 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
             outdoor=_numeric_value(inputs, CONF_OUTDOOR_TEMPERATURE),
             heat_meter=_numeric_value(inputs, CONF_HEAT_PUMP_PRODUCED_HEAT),
             electric_meter=_numeric_value(inputs, CONF_HEAT_PUMP_ELECTRICAL_ENERGY),
-            firing_available=_bool_value(inputs, CONF_STOVE_CHARGING_PUMP) is not None
-            or _numeric_value(inputs, CONF_STOVE_FLOW_TEMPERATURE) is not None,
+            # Tank-energy slope and manual start need no extra entity, so a
+            # firing signal exists whenever the tank estimate is valid.
         )
         previous_energy = (
             self.data.thermal.usable_energy_kwh if self.data is not None else None
@@ -555,13 +550,10 @@ class InputCoordinator(DataUpdateCoordinator[RuntimeSnapshot]):
                     self.hass, self._async_validity_refresh, min(transitions)
                 )
         if thermal.usable_energy_kwh is not None:
-            firing = _bool_value(inputs, CONF_STOVE_CHARGING_PUMP) is True or (
-                _numeric_value(inputs, CONF_STOVE_FLOW_TEMPERATURE) or -math.inf
-            ) >= _option(
-                dict(self._entry.options),
-                CONF_STOVE_TEMPERATURE_THRESHOLD,
-                DEFAULT_STOVE_TEMPERATURE_THRESHOLD,
-            )
+            # Learn from the same detection the advisor shows: pump, stove
+            # temperature, tank-energy slope, and manual start (per the
+            # configured detection mode). It trails this refresh by one update.
+            firing = self.advisor.state.firing_active
             accepted = self.calibration.observe(
                 Observation(
                     at=inputs.captured_at,

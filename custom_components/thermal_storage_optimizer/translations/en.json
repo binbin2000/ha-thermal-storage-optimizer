@@ -133,7 +133,8 @@
           "temperature_curves_enabled": "Learn temperature-dependent curves (heating curve and COP)",
           "curve_bin_width_c": "Learned curve bin width (°C outdoor)",
           "curve_min_confidence": "Minimum learned curve confidence",
-          "supplementary_heater_rated_power_kw": "Supplementary heater rated power (used with the share entity)"
+          "supplementary_heater_rated_power_kw": "Supplementary heater rated power (used with the share entity)",
+          "firing_detection_mode": "Stove firing detection"
         },
         "data_description": {
           "sensor_stale_after": "Maximum age for temperature and optional measurement updates.",
@@ -387,6 +388,14 @@
     "reset_learned_state": {
       "name": "Reset learned state",
       "description": "Reset bounded adaptive calibration while retaining deterministic settings, plans, modes, and safety state."
+    }
+  },
+  "selector": {
+    "firing_detection_mode": {
+      "options": {
+        "all_signals": "All signals (pump, stove temperature, tank-energy rise, manual start)",
+        "energy_slope": "Tank-energy rise only (plus manual start)"
+      }
     }
   }
 }

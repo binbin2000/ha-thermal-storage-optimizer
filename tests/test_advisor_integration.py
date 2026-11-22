@@ -11,12 +11,17 @@ from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.thermal_storage_optimizer.const import (
+    CONF_ADAPTIVE_CALIBRATION,
     CONF_ADVISOR_LANGUAGE,
     CONF_ALLOW_EXCEPTIONAL_FIRING,
+    CONF_FIRING_DETECTION,
     CONF_MINIMUM_FIRING_DURATION,
     CONF_NOTIFICATION_LEAD_TIME,
     CONF_NOTIFICATION_TARGET,
+    CONF_STOVE_CHARGING_PUMP,
+    CONF_STOVE_FLOW_TEMPERATURE,
     DOMAIN,
+    FIRING_DETECTION_ENERGY_SLOPE,
     INTEGRATION_NAME,
     SERVICE_SNOOZE,
     SERVICE_START_FIRING,
@@ -230,3 +235,97 @@ async def test_manual_and_forced_use_increase_precharge_target(
     assert manual is not None
     assert manual.additional_energy_kwh > auto.additional_energy_kwh
     assert forced == manual
+
+
+async def _setup_detection(
+    hass: HomeAssistant, options: dict[str, object]
+) -> MockConfigEntry:
+    """Load an entry with stove signals and adaptive calibration enabled."""
+    hass.states.async_set("sensor.stove_flow", "70", {"unit_of_measurement": "°C"})
+    hass.states.async_set("binary_sensor.stove_pump", "on")
+    hass.services.async_register("switch", "turn_on", AsyncMock())
+    hass.services.async_register("switch", "turn_off", AsyncMock())
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=INTEGRATION_NAME,
+        unique_id=UNIQUE_ID,
+        data={
+            **REQUIRED_CONFIG,
+            CONF_STOVE_FLOW_TEMPERATURE: "sensor.stove_flow",
+            CONF_STOVE_CHARGING_PUMP: "binary_sensor.stove_pump",
+        },
+        options={CONF_ADAPTIVE_CALIBRATION: True, **options},
+        version=5,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
+
+
+async def test_energy_slope_mode_ignores_pump_and_stove_temperature(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """Slope-only detection disregards other signals but honours manual start."""
+    freezer.move_to(datetime(2026, 9, 7, 16, tzinfo=UTC))
+    _set_advisor_inputs(hass)
+    entry = await _setup_detection(
+        hass, {CONF_FIRING_DETECTION: FIRING_DETECTION_ENERGY_SLOPE}
+    )
+    advisor = entry.runtime_data.advisor
+    assert not advisor.state.firing_active
+    await hass.services.async_call(DOMAIN, SERVICE_START_FIRING, blocking=True)
+    assert advisor.state.firing_active
+    await hass.services.async_call(DOMAIN, SERVICE_STOP_FIRING, blocking=True)
+    assert not advisor.state.firing_active
+
+    # A rising tank estimate alone is detected as firing.
+    for step in range(1, 5):
+        freezer.tick(timedelta(minutes=5))
+        for entity_id, base in (
+            ("sensor.tank_top", 36),
+            ("sensor.tank_middle", 34),
+            ("sensor.tank_bottom", 32),
+        ):
+            hass.states.async_set(
+                entity_id, str(base + 3 * step), {"unit_of_measurement": "°C"}
+            )
+        await hass.async_block_till_done()
+    assert advisor.state.firing_active
+
+
+async def test_all_signals_mode_detects_stove_temperature(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """The default mode still treats a hot stove flow or running pump as firing."""
+    freezer.move_to(datetime(2026, 9, 7, 16, tzinfo=UTC))
+    _set_advisor_inputs(hass)
+    entry = await _setup_detection(hass, {})
+    assert entry.runtime_data.advisor.state.firing_active
+
+
+async def test_calibration_learns_from_manual_and_slope_detected_firing(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """Adaptive calibration records the advisor's detection, not only pump/temp."""
+    freezer.move_to(datetime(2026, 9, 7, 16, tzinfo=UTC))
+    _set_advisor_inputs(hass)
+    entry = await _setup_detection(
+        hass, {CONF_FIRING_DETECTION: FIRING_DETECTION_ENERGY_SLOPE}
+    )
+    coordinator = entry.runtime_data
+    calibration = coordinator.calibration
+    assert calibration.observations
+    assert not calibration.observations[-1].firing_active
+
+    await hass.services.async_call(DOMAIN, SERVICE_START_FIRING, blocking=True)
+    freezer.tick(timedelta(minutes=1))
+    coordinator._async_validity_refresh(coordinator.data.captured_at)  # noqa: SLF001
+    await hass.async_block_till_done()
+    assert calibration.observations[-1].firing_active
+
+    await hass.services.async_call(DOMAIN, SERVICE_STOP_FIRING, blocking=True)
+    freezer.tick(timedelta(minutes=1))
+    coordinator._async_validity_refresh(coordinator.data.captured_at)  # noqa: SLF001
+    await hass.async_block_till_done()
+    assert not calibration.observations[-1].firing_active
