@@ -139,7 +139,8 @@ async def test_startup_before_entities_ready_and_recovery(hass: HomeAssistant) -
     assert state(hass, status_id).state == "invalid_data"
     assert state(hass, valid_id).state == STATE_OFF
     assert (
-        "tank_middle_entity:unavailable" in state(hass, status_id).attributes["issues"]
+        "tank_middle_entity (sensor.tank_middle):unavailable"
+        in state(hass, status_id).attributes["issues"]
     )
 
     hass.states.async_set("sensor.tank_middle", "50", {"unit_of_measurement": "°C"})

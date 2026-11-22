@@ -173,6 +173,9 @@ DEFAULT_PLAN_SUMMARY_INTERVALS: Final = 12
 MAX_PLAN_SUMMARY_INTERVALS: Final = 48
 STALE_TIME_UNIT: Final = UnitOfTime.SECONDS
 
+# Electrical draw above which the heat pump is considered running.
+HEAT_PUMP_RUNNING_KW: Final = 0.1
+
 REQUIRED_ENTITY_KEYS: Final = (
     CONF_TANK_TOP,
     CONF_TANK_MIDDLE,
