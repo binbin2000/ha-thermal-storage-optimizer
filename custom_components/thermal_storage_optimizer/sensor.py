@@ -39,6 +39,7 @@ from .price import forecast_coverage_hours
 
 if TYPE_CHECKING:
     from .advisor import AdvisorState
+    from .inputs import InputIssue
 
 type SensorValue = StateType | date | datetime | Decimal
 
@@ -372,7 +373,7 @@ class ThermalStorageOptimizerStatusSensor(
         return {
             "issue_count": len(issues),
             "required_issue_count": len(self.coordinator.data.required_issues),
-            "issues": [f"{issue.key}:{issue.problem.value}" for issue in issues],
+            "issues": [_format_issue(issue) for issue in issues],
         }
 
 
@@ -670,3 +671,10 @@ class ThermalStorageOptimizerControllerReasonSensor(_ControllerSensor):
     def native_value(self) -> str:
         """Return the current transition reason."""
         return self._controller.decision.reason
+
+
+def _format_issue(issue: InputIssue) -> str:
+    """Name the configured source entity so the issue is easy to trace."""
+    if issue.entity_id:
+        return f"{issue.key} ({issue.entity_id}):{issue.problem.value}"
+    return f"{issue.key}:{issue.problem.value}"

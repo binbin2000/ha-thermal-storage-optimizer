@@ -15,6 +15,7 @@ from custom_components.thermal_storage_optimizer.adapter import (
 )
 from custom_components.thermal_storage_optimizer.const import (
     CONF_HEAT_PUMP_ELECTRICAL_POWER,
+    CONF_MEASURED_COP,
     CONF_PRICE_FORECAST,
     CONF_SENSOR_STALE_AFTER,
     CONF_TANK_TOP,
@@ -223,3 +224,32 @@ def test_unchanged_value_that_is_still_reported_stays_fresh(
     assert [(issue.key, issue.problem) for issue in silent.required_issues] == [
         ("supply_target_entity", InputProblem.STALE)
     ]
+
+
+@pytest.mark.parametrize(
+    ("power", "cop_state", "expect_issue"),
+    [
+        ("0", "unknown", False),
+        ("0", "unavailable", False),
+        ("0", "abc", True),
+        ("1500", "unknown", True),
+        ("unknown", "unknown", True),
+    ],
+)
+def test_measured_cop_issue_hidden_only_while_heat_pump_is_idle(
+    hass: HomeAssistant, power: str, cop_state: str, *, expect_issue: bool
+) -> None:
+    """Test an absent COP is expected while the heat pump draws no power."""
+    set_valid_required_states(hass)
+    hass.states.async_set("sensor.heat_pump_power", power, {"unit_of_measurement": "W"})
+    hass.states.async_set("sensor.measured_cop", cop_state)
+    configured = {
+        **REQUIRED_CONFIG,
+        CONF_HEAT_PUMP_ELECTRICAL_POWER: "sensor.heat_pump_power",
+        CONF_MEASURED_COP: "sensor.measured_cop",
+    }
+
+    snapshot = HomeAssistantInputAdapter(hass, configured, {}).snapshot()
+
+    cop_issues = [i for i in snapshot.issues if i.key == CONF_MEASURED_COP]
+    assert bool(cop_issues) is expect_issue

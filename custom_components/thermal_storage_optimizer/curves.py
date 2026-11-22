@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final
 
 from .adaptive import ParameterBounds
+from .const import HEAT_PUMP_RUNNING_KW
 from .cop import LearnedCopModel, carnot_efficiency
 
 if TYPE_CHECKING:
@@ -37,7 +38,6 @@ MIN_CARNOT_SAMPLES: Final = 6
 HEATER_SHARE_LIMITS: Final = (0.0, 1.0)
 BALANCE_POINT_SHARE: Final = 0.05
 _EXTRAPOLATION_CONFIDENCE_FACTOR: Final = 0.8
-_HEAT_PUMP_RUNNING_KW: Final = 0.1
 _OUTDOOR_LIMITS_C: Final = (-60.0, 60.0)
 
 
@@ -360,7 +360,7 @@ class TemperatureCurveSet:
                 or accepted
             )
         running = heat_pump_power_kw is None or heat_pump_power_kw > (
-            _HEAT_PUMP_RUNNING_KW
+            HEAT_PUMP_RUNNING_KW
         )
         if measured_cop is not None and running:
             accepted = self.cop_curve.add_sample(now, outdoor_c, measured_cop) or (

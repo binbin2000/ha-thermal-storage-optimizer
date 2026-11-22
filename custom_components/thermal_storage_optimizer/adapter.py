@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from datetime import timedelta
 from typing import Final
 
@@ -42,10 +43,17 @@ from .const import (
     CONF_WEATHER,
     DEFAULT_FORECAST_STALE_AFTER,
     DEFAULT_SENSOR_STALE_AFTER,
+    HEAT_PUMP_RUNNING_KW,
     OPTIONAL_ENTITY_KEYS,
     REQUIRED_ENTITY_KEYS,
 )
-from .inputs import InputKind, NormalizedInputSnapshot, RawInput, normalize_inputs
+from .inputs import (
+    InputKind,
+    InputProblem,
+    NormalizedInputSnapshot,
+    RawInput,
+    normalize_inputs,
+)
 from .price import (
     PriceForecast,
     PriceForecastError,
@@ -77,6 +85,10 @@ _KINDS: Final = {
     CONF_SUPPLEMENTARY_HEATER_SHARE: InputKind.PERCENTAGE,
     CONF_NOTIFICATION_TARGET: InputKind.AVAILABILITY,
 }
+# Many heat pumps report no COP while the compressor is idle.
+_IDLE_COP_PROBLEMS: Final = frozenset(
+    {InputProblem.UNKNOWN, InputProblem.UNAVAILABLE, InputProblem.STALE}
+)
 _LOGGER = logging.getLogger(__name__)
 _NORDPOOL_DOMAIN: Final = "nordpool"
 _NORDPOOL_GET_PRICES: Final = "get_prices_for_date"
@@ -201,7 +213,7 @@ class HomeAssistantInputAdapter:
                     stale_after=stale_after,
                 )
             )
-        return normalize_inputs(tuple(raw_inputs), now)
+        return _drop_idle_cop_issue(normalize_inputs(tuple(raw_inputs), now))
 
     def price_forecast(self, config: PriceNormalizationConfig) -> PriceForecast:
         """Adapt cached official Nord Pool or timestamped entity attributes."""
@@ -374,3 +386,25 @@ def _timestamped_attribute_items(attributes: Mapping[str, object]) -> object:
             else:
                 combined.append(item)
     return combined if found else None
+
+
+def _drop_idle_cop_issue(snapshot: NormalizedInputSnapshot) -> NormalizedInputSnapshot:
+    """Hide a missing measured COP while the heat pump is known to be idle.
+
+    A COP is undefined without electrical input, so an unknown, unavailable or
+    stale COP sensor is expected then. The issue is kept whenever the heat pump
+    power is not known, because nothing then shows that the pump is idle.
+    """
+    power = snapshot.values.get(CONF_HEAT_PUMP_ELECTRICAL_POWER)
+    if power is None or not isinstance(power.value, int | float):
+        return snapshot
+    if power.value > HEAT_PUMP_RUNNING_KW:
+        return snapshot
+    issues = tuple(
+        issue
+        for issue in snapshot.issues
+        if not (issue.key == CONF_MEASURED_COP and issue.problem in _IDLE_COP_PROBLEMS)
+    )
+    if len(issues) == len(snapshot.issues):
+        return snapshot
+    return replace(snapshot, issues=issues)
