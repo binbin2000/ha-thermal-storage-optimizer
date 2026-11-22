@@ -36,6 +36,10 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Input freshness is now measured from the last report instead of the last
+  change. A healthy sensor that kept reporting the same value for longer than the
+  stale limit, such as a steady supply setpoint or an idle heat pump's power, was
+  marked stale; for a required input this put the controller in fault fallback.
 - The planner's decision reason now shows the next release in Home Assistant's
   local time, rounded up to the whole minute, instead of a raw UTC timestamp with
   microseconds that looked like a time in the past and changed the entity state
