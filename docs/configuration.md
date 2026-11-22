@@ -60,7 +60,7 @@ required input set.
 
 | Option | Default | Allowed range | Effect |
 | --- | ---: | ---: | --- |
-| Measurement stale after | 3,600 s | 60–86,400 s | Maximum age of temperature and optional measurement updates. |
+| Measurement stale after | 3,600 s | 60–86,400 s | Maximum time since a temperature or optional measurement was last reported. A source that keeps reporting an unchanged value stays fresh. A source that only publishes when its value changes (some bridges do this for setpoints and idle power readings) still looks silent while the value is steady; raise this limit for such sources. |
 | Price forecast stale after | 129,600 s (36 h) | 3,600–259,200 s | Maximum age of a price publication before it is rejected. |
 | Total tank volume | 500 L | 1–10,000 L | Physical tank volume. It must equal the sum of the three effective layer volumes. |
 | Top layer effective volume | 166.67 L | 0.1–10,000 L | Water volume represented by the top sensor. |

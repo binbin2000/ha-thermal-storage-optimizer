@@ -194,7 +194,10 @@ class HomeAssistantInputAdapter:
                         if state is not None
                         else None
                     ),
-                    updated_at=state.last_updated if state is not None else None,
+                    # Freshness follows the last report, not the last change: a
+                    # healthy sensor that keeps reporting the same value (an idle
+                    # heat pump's power, a steady setpoint) must not turn stale.
+                    updated_at=state.last_reported if state is not None else None,
                     stale_after=stale_after,
                 )
             )

@@ -4,6 +4,7 @@ from datetime import timedelta
 from unittest.mock import AsyncMock
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
@@ -187,3 +188,38 @@ def test_timestamped_raw_today_and_tomorrow_attributes_are_supported(
         PriceNormalizationConfig()
     )
     assert [item.marginal_cost_per_kwh for item in result.intervals] == [0.5, 0.8]
+
+
+def test_unchanged_value_that_is_still_reported_stays_fresh(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """A steady value is fresh while its source reports; silence still goes stale."""
+    set_valid_required_states(hass)
+    adapter = HomeAssistantInputAdapter(
+        hass, REQUIRED_CONFIG, {CONF_SENSOR_STALE_AFTER: 3600}
+    )
+    attributes = {"unit_of_measurement": "°C"}
+    for _ in range(3):
+        freezer.tick(timedelta(minutes=50))
+        for entity_id in REQUIRED_CONFIG.values():
+            state = hass.states.get(entity_id)
+            assert state is not None
+            # Same state and attributes: Home Assistant records a report only.
+            hass.states.async_set(entity_id, state.state, dict(state.attributes))
+    supply = hass.states.get("sensor.supply_target")
+    assert supply is not None
+    assert supply.attributes == attributes
+    assert supply.last_reported > supply.last_updated
+    assert dt_util.utcnow() - supply.last_updated > timedelta(hours=2)
+    assert adapter.snapshot().is_valid
+
+    freezer.tick(timedelta(minutes=61))
+    for entity_id in REQUIRED_CONFIG.values():
+        if entity_id != "sensor.supply_target":
+            state = hass.states.get(entity_id)
+            assert state is not None
+            hass.states.async_set(entity_id, state.state, dict(state.attributes))
+    silent = adapter.snapshot()
+    assert [(issue.key, issue.problem) for issue in silent.required_issues] == [
+        ("supply_target_entity", InputProblem.STALE)
+    ]
