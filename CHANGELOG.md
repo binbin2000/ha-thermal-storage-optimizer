@@ -5,6 +5,8 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-22
+
 ### Fixed
 
 - The firing deadline no longer jumps past every price peak when a valuable
