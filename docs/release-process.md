@@ -9,9 +9,14 @@
 4. Build locally with `python scripts/build_release.py`. Inspect that the archive has
    exactly one `custom_components/thermal_storage_optimizer` tree and no caches,
    development harness, credentials, database, logs, or local Home Assistant state.
-5. Confirm CI and Hassfest pass, create an annotated `v<version>` tag from the reviewed
-   commit, and push it. The release workflow requires the tag and metadata versions to
-   match, reruns quality checks, builds the archive, and creates the GitHub release.
+5. Confirm CI and Hassfest pass on the default branch, then publish in one of two ways:
+   - Run the **Release** workflow manually from the default branch (GitHub → Actions →
+     Release → Run workflow). It creates the `v<version>` tag and the GitHub release.
+   - Or create an annotated `v<version>` tag from the reviewed commit and push it.
+
+   Either way the workflow requires the metadata versions to agree and the release
+   notes file to exist, refuses a version that is already released, reruns the quality
+   checks, builds the archive, and creates the GitHub release.
 6. On a non-production Home Assistant instance, execute the clean-install, migration,
    reload, restart, removal, dry-run, and active-control preservation tests in
    [installation and lifecycle](installation.md) and the physical checks in
