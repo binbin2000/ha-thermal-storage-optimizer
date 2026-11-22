@@ -16,15 +16,15 @@ INCLUDED_SUFFIXES: Final = frozenset({".js", ".json", ".png", ".py", ".yaml"})
 ARCHIVE_TIMESTAMP: Final = (2026, 1, 1, 0, 0, 0)
 
 
-def release_version() -> str:
+def release_version(root: Path = ROOT, component: Path = COMPONENT) -> str:
     """Validate and return the single release version."""
-    manifest = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
-    with (ROOT / "pyproject.toml").open("rb") as file:
+    manifest = json.loads((component / "manifest.json").read_text(encoding="utf-8"))
+    with (root / "pyproject.toml").open("rb") as file:
         project_version = tomllib.load(file)["project"]["version"]
 
     const_line = next(
         line
-        for line in (COMPONENT / "const.py").read_text(encoding="utf-8").splitlines()
+        for line in (component / "const.py").read_text(encoding="utf-8").splitlines()
         if line.startswith("VERSION:")
     )
     source_version = const_line.rsplit('"', 2)[1]

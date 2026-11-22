@@ -1,22 +1,29 @@
 # Maintainer release process
 
-1. Update the SemVer value in `pyproject.toml`, `manifest.json`, and `const.py`; add a
-   dated changelog section and `docs/release-notes-<version>.md`.
-2. Install the pinned dev environment with `python -m pip install -e ".[dev]"`.
-3. Run `python scripts/run_tests.py`, `python -m ruff format --check .`,
-   `python -m ruff check .`, `python -m mypy`, and
-   `python scripts/build_release.py --check`.
-4. Build locally with `python scripts/build_release.py`. Inspect that the archive has
-   exactly one `custom_components/thermal_storage_optimizer` tree and no caches,
-   development harness, credentials, database, logs, or local Home Assistant state.
-5. Confirm CI and Hassfest pass on the default branch, then publish in one of two ways:
-   - Run the **Release** workflow manually from the default branch (GitHub → Actions →
-     Release → Run workflow). It creates the `v<version>` tag and the GitHub release.
-   - Or create an annotated `v<version>` tag from the reviewed commit and push it.
+1. Describe every user-visible change under `## [Unreleased]` in `CHANGELOG.md`. A
+   release with an empty unreleased section is refused. To hand-write richer release
+   notes, add `docs/release-notes-<version>.md` for the coming version; otherwise they
+   are generated from the changelog section.
+2. Confirm CI and Hassfest pass on the default branch.
+3. Run the **Release** workflow from the default branch (GitHub → Actions → Release →
+   Run workflow) and choose `patch`, `minor`, or `major`, or type an exact `X.Y.Z`.
+   The workflow:
+   - raises the version in `pyproject.toml`, `manifest.json`, and `const.py` with
+     `python -m scripts.bump_version`, dates the unreleased changelog section, and
+     writes the release notes if they do not exist;
+   - refuses a version whose tag or release already exists;
+   - runs the tests, formatting, lint, typing, and package checks;
+   - commits `Release X.Y.Z` to the default branch, builds the archive, and creates
+     the `v<version>` tag and GitHub release with the archive attached.
 
-   Either way the workflow requires the metadata versions to agree and the release
-   notes file to exist, refuses a version that is already released, reruns the quality
-   checks, builds the archive, and creates the GitHub release.
+   If the default branch is protected, allow `github-actions[bot]` to push to it.
+4. To rehearse locally, run `python -m scripts.bump_version patch` (or `minor`,
+   `major`), then `python scripts/run_tests.py`, `python -m ruff format --check .`,
+   `python -m ruff check .`, `python -m mypy`, and `python scripts/build_release.py`.
+   Inspect that the archive has exactly one `custom_components/thermal_storage_optimizer`
+   tree and no caches, development harness, credentials, database, logs, or local Home
+   Assistant state. Discard the local version change afterwards; the workflow makes it.
+5. Pull the release commit before continuing work on the default branch.
 6. On a non-production Home Assistant instance, execute the clean-install, migration,
    reload, restart, removal, dry-run, and active-control preservation tests in
    [installation and lifecycle](installation.md) and the physical checks in
