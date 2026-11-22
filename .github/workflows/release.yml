@@ -56,7 +56,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           HOW: ${{ inputs.version != '' && inputs.version || inputs.bump }}
         run: |
-          version="$(python -m scripts.bump_version "$HOW")"
+          if ! version="$(python -m scripts.bump_version "$HOW" 2> bump.err)"; then
+            echo "::error::$(cat bump.err)"
+            exit 1
+          fi
+          rm bump.err
           tag="v$version"
           if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
             echo "::error::Tag $tag already exists."
