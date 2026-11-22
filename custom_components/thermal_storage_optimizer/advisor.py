@@ -32,6 +32,7 @@ from .const import (
     CONF_ALLOW_EXCEPTIONAL_FIRING,
     CONF_BOTTOM_LAYER_VOLUME,
     CONF_CHARGING_SLOPE_THRESHOLD,
+    CONF_FIRING_DETECTION,
     CONF_FORCED_USE_MARGIN,
     CONF_HIGH_TEMPERATURE_THRESHOLD,
     CONF_INITIAL_CHARGING_POWER,
@@ -65,6 +66,7 @@ from .const import (
     DEFAULT_ADVISOR_LANGUAGE,
     DEFAULT_ALLOW_EXCEPTIONAL_FIRING,
     DEFAULT_CHARGING_SLOPE_THRESHOLD,
+    DEFAULT_FIRING_DETECTION,
     DEFAULT_FORCED_USE_MARGIN,
     DEFAULT_HIGH_TEMPERATURE_THRESHOLD,
     DEFAULT_INITIAL_CHARGING_POWER,
@@ -84,6 +86,7 @@ from .const import (
     DEFAULT_STOVE_TEMPERATURE_THRESHOLD,
     DEFAULT_USABLE_CAPACITY,
     DOMAIN,
+    FIRING_DETECTION_ENERGY_SLOPE,
     SERVICE_ACKNOWLEDGE,
     SERVICE_DISMISS,
     SERVICE_SNOOZE,
@@ -245,10 +248,22 @@ class ChargingAdvisor:
                     ),
                 ),
             )
+            # In energy-slope mode the pump and stove-temperature signals are
+            # ignored; an explicit manual start always counts.
+            slope_only = (
+                self.entry.options.get(CONF_FIRING_DETECTION, DEFAULT_FIRING_DETECTION)
+                == FIRING_DETECTION_ENERGY_SLOPE
+            )
             firing = detect_active_firing(
-                pump_active=self._bool_value(data, CONF_STOVE_CHARGING_PUMP),
-                stove_temperature_c=self._number_value(
-                    data, CONF_STOVE_FLOW_TEMPERATURE
+                pump_active=(
+                    None
+                    if slope_only
+                    else self._bool_value(data, CONF_STOVE_CHARGING_PUMP)
+                ),
+                stove_temperature_c=(
+                    None
+                    if slope_only
+                    else self._number_value(data, CONF_STOVE_FLOW_TEMPERATURE)
                 ),
                 stove_temperature_threshold_c=self._option(
                     CONF_STOVE_TEMPERATURE_THRESHOLD,

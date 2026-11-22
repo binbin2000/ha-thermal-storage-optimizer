@@ -118,7 +118,8 @@ permission.
 | Quiet hours start / end | 23:00 / 07:00 | Local times | Suppresses notifications in this interval. Equal endpoints disable quiet hours. |
 | Allow exceptional out-of-window recommendations | Off | On/off | Allows a recommendation outside preferred windows when no normal window can meet the deadline. |
 | Initial effective net charging power | 6 kW | 0–100 kW | Fallback rate of net tank-energy increase; use measured net storage gain, not stove nameplate output. |
-| Active stove temperature threshold | 55 °C | 0–150 °C | Stove-flow temperature that indicates firing. |
+| Stove firing detection | All signals | All signals / Tank-energy rise only | Which signals count as an active firing session. **All signals** combines the charging pump, the stove-flow temperature threshold, a rising tank-energy estimate, and manual start. **Tank-energy rise only** ignores the pump and stove-flow temperature; manual start still counts. The same detection drives the advisor and adaptive calibration. |
+| Active stove temperature threshold | 55 °C | 0–150 °C | Stove-flow temperature at or above which firing is detected. Not used in tank-energy-rise-only detection. |
 | Charging slope detection threshold | 1 kW | 0–100 kW | Positive tank-energy slope that can indicate firing. |
 | Maximum top/middle/bottom temperature | 80 °C each | 20–120 °C | Per-layer charging target limits. |
 | Forced-use threshold margin | 3 °C | 0–30 °C | Keeps advisor targets below the independent forced-use threshold. |

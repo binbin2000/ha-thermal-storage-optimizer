@@ -34,6 +34,7 @@ from .const import (
     CONF_CURVE_BIN_WIDTH,
     CONF_CURVE_MIN_CONFIDENCE,
     CONF_ECONOMIC_DEADBAND,
+    CONF_FIRING_DETECTION,
     CONF_FIXED_COP,
     CONF_FLOW_RATE,
     CONF_FORCED_USE_MARGIN,
@@ -142,6 +143,7 @@ from .const import (
     DEFAULT_TREND_DEADBAND,
     DEFAULT_USABLE_CAPACITY,
     DOMAIN,
+    FIRING_DETECTION_MODES,
     INTEGRATION_NAME,
     UNIQUE_ID,
 )
@@ -449,6 +451,12 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Optional(CONF_INITIAL_CHARGING_POWER): _number_selector(0, 100, 0.1, "kW"),
         vol.Optional(CONF_STOVE_TEMPERATURE_THRESHOLD): _number_selector(
             0, 150, 0.5, "°C"
+        ),
+        vol.Optional(CONF_FIRING_DETECTION): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=list(FIRING_DETECTION_MODES),
+                translation_key=CONF_FIRING_DETECTION,
+            )
         ),
         vol.Optional(CONF_CHARGING_SLOPE_THRESHOLD): _number_selector(
             0, 100, 0.1, "kW"

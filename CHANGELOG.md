@@ -36,6 +36,16 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
   heat share per outdoor-temperature bin, reports the learned balance point in
   diagnostics, and exposes the current heater heat share as a diagnostic sensor.
 
+### Changed
+
+- Adaptive calibration now learns stove sessions from the advisor's firing
+  detection, so a rising tank-energy estimate and a manual start count as firing.
+  Previously only the charging pump and stove-flow temperature did, and an
+  installation without either entity learned nothing about its firing sessions.
+- New **Stove firing detection** option: all signals (default), or tank-energy
+  rise only, which ignores the pump and stove-flow temperature. Manual start
+  counts in both modes.
+
 ### Fixed
 
 - Input freshness is now measured from the last report instead of the last
