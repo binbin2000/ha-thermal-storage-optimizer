@@ -134,7 +134,8 @@
           "curve_bin_width_c": "Binbredd för inlärda kurvor (°C ute)",
           "curve_min_confidence": "Lägsta konfidens för inlärda kurvor",
           "supplementary_heater_rated_power_kw": "Elpatronens nominella effekt (används med procententiteten)",
-          "firing_detection_mode": "Detektering av kamineldning"
+          "firing_detection_mode": "Detektering av kamineldning",
+          "output_acknowledgement_timeout_s": "Kvittenstid för utgången"
         },
         "data_description": {
           "sensor_stale_after": "Högsta ålder för temperaturer och valfria mätvärden.",

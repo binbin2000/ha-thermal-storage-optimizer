@@ -98,6 +98,7 @@ charge and capacity limits.
 | Forced-use hysteresis | 5 °C | 0.5–30 °C | Keeps forced use latched until every valid layer is this far below the threshold. Must be lower than the threshold. |
 | Startup grace period | 300 s | 0–3,600 s | Prevents the reserve output from energizing after a load, reload, or restart. |
 | Minimum output dwell time | 1,800 s | 0–14,400 s | Prevents output chatter in Auto, measured from the last actual use/reserve change. Manual Use/Reserve selections, forced high-temperature use, and fail-safe off remain immediate. |
+| Output acknowledgement timeout | 30 s | 5–600 s | How long the output entity may take to show the commanded state. Raise it for entities whose state is polled or bridged slowly. When it is exceeded the output is requested off and the command is retried automatically after 1, 5, and then every 15 minutes. |
 
 Home Assistant is not a safety controller. Independent boiler/stove,
 overtemperature, pressure, circulation, and freeze protection must remain in place.

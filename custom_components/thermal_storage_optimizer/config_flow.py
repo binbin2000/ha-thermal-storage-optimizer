@@ -66,6 +66,7 @@ from .const import (
     CONF_NOTIFICATION_TARGET,
     CONF_NOTIFICATION_UPDATE_INTERVAL,
     CONF_OUTDOOR_TEMPERATURE,
+    CONF_OUTPUT_ACK_TIMEOUT,
     CONF_OUTPUT_INVERTED,
     CONF_PREFERRED_FIRING_WINDOWS,
     CONF_PRICE_FORECAST,
@@ -441,6 +442,7 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Required(
             CONF_MINIMUM_DWELL_TIME, default=DEFAULT_MINIMUM_DWELL_TIME
         ): _number_selector(0, 14400, 1, "s"),
+        vol.Optional(CONF_OUTPUT_ACK_TIMEOUT): _number_selector(5, 600, 1, "s"),
         vol.Optional(CONF_PREFERRED_FIRING_WINDOWS): selector.ObjectSelector(),
         vol.Optional(CONF_MINIMUM_FIRING_DURATION): _number_selector(1, 720, 1, "min"),
         vol.Optional(CONF_MAXIMUM_FIRING_DURATION): _number_selector(1, 720, 1, "min"),
