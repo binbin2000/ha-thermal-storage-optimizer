@@ -84,7 +84,10 @@ def release_changelog(changelog: Path, version: str, date: dt.date) -> str:
     body_end = len(text) if next_heading < 0 else next_heading + 1
     body = text[body_start:body_end].strip()
     if not body:
-        msg = f"The {UNRELEASED_HEADING} section in {changelog.name} is empty"
+        msg = (
+            f"The {UNRELEASED_HEADING} section in {changelog.name} is empty. "
+            "Describe the changes there before releasing."
+        )
         raise ValueError(msg)
     released = (
         f"{UNRELEASED_HEADING}\n\n## [{version}] - {date.isoformat()}\n\n{body}\n\n"

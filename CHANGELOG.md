@@ -5,6 +5,19 @@ categories. Releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Each issue on the status sensor now names the configured source entity, for
+  example `measured_cop_entity (sensor.hp_cop):unknown`, so it is clear that the
+  problem is in the user's sensor and not in the integration.
+
+### Fixed
+
+- An unknown, unavailable or stale measured COP is no longer reported as an issue
+  while the heat pump electrical power shows that the pump is idle, since many heat
+  pumps publish no COP when the compressor is off. The issue is kept when the power
+  is unknown or the pump is running.
+
 ## [1.2.0] - 2026-11-22
 
 ### Fixed
